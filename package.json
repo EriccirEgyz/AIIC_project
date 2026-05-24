@@ -11,7 +11,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
-    "postinstall": "prisma generate"
+    "pdfjs:copy-worker": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')\"",
+    "postinstall": "prisma generate && npm run pdfjs:copy-worker"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.65",
@@ -22,6 +23,7 @@
     "better-sqlite3": "^12.10.0",
     "nanoid": "^5.1.11",
     "next": "16.2.6",
+    "pdfjs-dist": "^5.7.284",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "zod": "^4.4.3"

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { renderPdfToImages, type RenderedPage } from "@/lib/pdf-render";
 
 // 8 大类按 2026 本科生 AI 项目真实分布排序(综合 NeurIPS 2025 主题分布 +
 // 国内高校 AI 招生方向 + 知乎讨论)。「其他」兜底 AI4Sci/MLSys/具身/AI 安全
@@ -17,6 +18,8 @@ const FIELD_PRESETS = [
   "模型效率 / 推理优化",
 ];
 const FIELD_CUSTOM = "__custom__";
+const MAX_PDF_PAGES = 5;
+const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
 export default function ExperienceForm() {
   const router = useRouter();
@@ -26,6 +29,10 @@ export default function ExperienceForm() {
   const [error, setError] = useState<string | null>(null);
   const [genLoading, setGenLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [pages, setPages] = useState<RenderedPage[]>([]);
+  const [pdfName, setPdfName] = useState<string | null>(null);
+  const [pdfRendering, setPdfRendering] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 真正发给 API 的方向值:预设直接用,自定义用 customField。
   const field =
@@ -62,6 +69,40 @@ export default function ExperienceForm() {
     }
   }
 
+  async function handlePdfPick(e: React.ChangeEvent<HTMLInputElement>) {
+    setError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      setError("只支持 PDF 文件(PPT 请先在 PowerPoint 里导出为 PDF)");
+      return;
+    }
+    if (file.size > MAX_PDF_BYTES) {
+      setError(`PDF 不能超过 ${MAX_PDF_BYTES / 1024 / 1024}MB`);
+      return;
+    }
+    setPdfName(file.name);
+    setPdfRendering(true);
+    setPages([]);
+    try {
+      const rendered = await renderPdfToImages(file, {
+        maxPages: MAX_PDF_PAGES,
+      });
+      setPages(rendered);
+    } catch (err) {
+      setError(`PDF 解析失败: ${(err as Error).message}`);
+      setPdfName(null);
+    } finally {
+      setPdfRendering(false);
+    }
+  }
+
+  function clearPdf() {
+    setPages([]);
+    setPdfName(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   async function startInterview(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -76,10 +117,14 @@ export default function ExperienceForm() {
     }
     startTransition(async () => {
       try {
+        const body: Record<string, unknown> = { experience, field };
+        if (pages.length > 0) {
+          body.images = pages.map((p) => ({ dataUrl: p.dataUrl }));
+        }
         const res = await fetch("/api/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ experience, field }),
+          body: JSON.stringify(body),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message ?? data.error ?? "创建失败");
@@ -158,16 +203,81 @@ export default function ExperienceForm() {
         </div>
       </div>
 
+      {/* PDF 上传(可选) */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-sm font-medium">
+            简历 / PPT 上传{" "}
+            <span className="text-xs font-normal text-zinc-400">
+              (可选 · 真实复试时导师会看)
+            </span>
+          </span>
+          {pdfName && (
+            <button
+              type="button"
+              onClick={clearPdf}
+              className="text-xs text-rose-600 dark:text-rose-400 hover:underline"
+            >
+              移除
+            </button>
+          )}
+        </div>
+        {pages.length === 0 && !pdfRendering && (
+          <label className="block cursor-pointer rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 px-4 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={handlePdfPick}
+              className="hidden"
+            />
+            点击选择 PDF · 最多 {MAX_PDF_PAGES} 页 · 最大{" "}
+            {MAX_PDF_BYTES / 1024 / 1024}MB
+            <div className="mt-1 text-xs text-zinc-400">
+              PPT 请先在 PowerPoint 里另存为 PDF
+            </div>
+          </label>
+        )}
+        {pdfRendering && (
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 px-4 py-6 text-center text-sm text-zinc-500 animate-pulse">
+            正在渲染 PDF 页面…
+          </div>
+        )}
+        {pages.length > 0 && (
+          <div>
+            <div className="text-xs text-zinc-500 mb-2">
+              ✓ 已加载 <strong>{pdfName}</strong> · {pages.length} 页 · AI
+              将在开场前先"翻一遍"你的材料
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {pages.map((p) => (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  key={p.pageNumber}
+                  src={p.dataUrl}
+                  alt={`第 ${p.pageNumber} 页`}
+                  className="h-32 w-auto rounded border border-zinc-200 dark:border-zinc-700 bg-white"
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {error && (
         <p className="text-sm text-rose-600 dark:text-rose-400">⚠ {error}</p>
       )}
 
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || pdfRendering}
         className="w-full rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 py-3 text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white disabled:opacity-50 transition-colors"
       >
-        {isPending ? "正在为你叫醒一位 985 导师…" : "开始模拟追问 →"}
+        {isPending
+          ? pages.length > 0
+            ? "导师正在翻你的材料…"
+            : "正在为你叫醒一位 985 导师…"
+          : "开始模拟追问 →"}
       </button>
     </form>
   );
