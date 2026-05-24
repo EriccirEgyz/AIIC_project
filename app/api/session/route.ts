@@ -9,6 +9,8 @@ import {
 } from "@/lib/prompts/interviewer";
 import { recordUsage } from "@/lib/usage";
 
+// targetTier 在 UI 上已下线,但 DB 列仍存在(默认 top5)。保留 zod 兜底
+// 是为了 backward compat — 任何老 client 还能跑通。
 const Body = z.object({
   experience: z.string().min(20, "经历至少 20 字").max(8000),
   field: z.string().min(1).max(60),

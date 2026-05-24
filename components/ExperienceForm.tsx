@@ -18,18 +18,10 @@ const FIELD_PRESETS = [
 ];
 const FIELD_CUSTOM = "__custom__";
 
-const TIERS = [
-  { value: "top5", label: "Top 5 (清北复交浙)", hint: "犀利、刨根问底" },
-  { value: "top10", label: "Top 10 / C9", hint: "严谨、关注复现" },
-  { value: "211", label: "211 / 双一流", hint: "友善但专业" },
-] as const;
-
 export default function ExperienceForm() {
   const router = useRouter();
   const [fieldChoice, setFieldChoice] = useState<string>(FIELD_PRESETS[0]);
   const [customField, setCustomField] = useState("");
-  const [targetTier, setTargetTier] =
-    useState<(typeof TIERS)[number]["value"]>("top5");
   const [experience, setExperience] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [genLoading, setGenLoading] = useState(false);
@@ -87,7 +79,7 @@ export default function ExperienceForm() {
         const res = await fetch("/api/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ experience, field, targetTier }),
+          body: JSON.stringify({ experience, field }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message ?? data.error ?? "创建失败");
@@ -103,49 +95,39 @@ export default function ExperienceForm() {
       onSubmit={startInterview}
       className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 sm:p-8 shadow-sm space-y-6"
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <label className="block">
-          <span className="text-sm font-medium">AI 研究方向</span>
-          <select
-            value={fieldChoice}
-            onChange={(e) => setFieldChoice(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
-          >
-            {FIELD_PRESETS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-            <option value={FIELD_CUSTOM}>其他(自定义)…</option>
-          </select>
-          {fieldChoice === FIELD_CUSTOM && (
-            <input
-              type="text"
-              value={customField}
-              onChange={(e) => setCustomField(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
-              placeholder="如 AI for Science / 类脑计算 / 神经辐射场"
-              maxLength={60}
-              autoFocus
-              required
-            />
-          )}
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium">目标院校层次</span>
-          <select
-            value={targetTier}
-            onChange={(e) => setTargetTier(e.target.value as typeof targetTier)}
-            className="mt-1.5 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
-          >
-            {TIERS.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label} — {t.hint}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <label className="block">
+        <span className="text-sm font-medium">目标导师方向</span>
+        <select
+          value={fieldChoice}
+          onChange={(e) => setFieldChoice(e.target.value)}
+          className="mt-1.5 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+        >
+          {FIELD_PRESETS.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+          <option value={FIELD_CUSTOM}>其他(自定义)…</option>
+        </select>
+        {fieldChoice === FIELD_CUSTOM && (
+          <input
+            type="text"
+            value={customField}
+            onChange={(e) => setCustomField(e.target.value)}
+            className="mt-2 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+            placeholder="如 AI for Science / 类脑计算 / 神经辐射场"
+            maxLength={60}
+            autoFocus
+            required
+          />
+        )}
+        <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+          你想申请的导师所在的研究方向。
+          <span className="text-zinc-400 dark:text-zinc-500">
+            不一定等于你已做项目的方向 — AI 会按"这位导师"的视角追问你。
+          </span>
+        </p>
+      </label>
 
       <div>
         <div className="flex items-center justify-between mb-1.5">

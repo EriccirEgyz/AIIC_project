@@ -35,9 +35,8 @@ export default async function InterviewPage({ params }: { params: Params }) {
             ← 回首页
           </a>
           <div className="text-zinc-500">
-            <span className="hidden sm:inline">{session.field} · </span>
             <span className="font-medium text-zinc-900 dark:text-zinc-100">
-              {tierLabel(session.targetTier)}
+              {session.field}
             </span>{" "}
             导师追问
           </div>
@@ -46,8 +45,4 @@ export default async function InterviewPage({ params }: { params: Params }) {
       <InterviewChat sessionId={id} initialMessages={initialMessages} />
     </main>
   );
-}
-
-function tierLabel(t: string) {
-  return t === "top5" ? "Top 5" : t === "top10" ? "Top 10" : "211";
 }

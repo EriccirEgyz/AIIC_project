@@ -45,7 +45,7 @@ export default async function ReportPage({ params }: { params: Params }) {
           反馈报告
         </p>
         <h1 className="text-2xl sm:text-3xl font-semibold mt-2 mb-6">
-          {session.field} · {tierLabel(session.targetTier)} 导师追问总结
+          {session.field} 导师追问总结
         </h1>
         {report ? (
           <ReportView report={report} sessionId={id} />
@@ -55,8 +55,4 @@ export default async function ReportPage({ params }: { params: Params }) {
       </div>
     </main>
   );
-}
-
-function tierLabel(t: string) {
-  return t === "top5" ? "Top 5" : t === "top10" ? "Top 10" : "211";
 }
