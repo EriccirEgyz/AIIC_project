@@ -40,6 +40,10 @@ yarn-error.log*
 /prisma/*.db
 /prisma/*.db-journal
 
+# scratch commit message files
+.commit_msg.tmp
+.commit_msg*.tmp
+
 # vercel
 .vercel
 
