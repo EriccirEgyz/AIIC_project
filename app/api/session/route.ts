@@ -1,12 +1,13 @@
 import { generateText } from "ai";
 import { z } from "zod";
-import { mainModel } from "@/lib/llm";
+import { mainModel, mainModelId } from "@/lib/llm";
 import { prisma } from "@/lib/db";
 import {
   buildInterviewerSystemPrompt,
   extractDimension,
   type Tier,
 } from "@/lib/prompts/interviewer";
+import { recordUsage } from "@/lib/usage";
 
 const Body = z.object({
   experience: z.string().min(20, "经历至少 20 字").max(8000),
@@ -28,9 +29,9 @@ export async function POST(req: Request) {
     data: { experience, field, targetTier },
   });
 
-  // 同步生成第一句开场问题(非流式,UI 跳转后立刻可见)
+  const model = mainModelId();
   try {
-    const { text } = await generateText({
+    const { text, usage } = await generateText({
       model: mainModel(),
       system: buildInterviewerSystemPrompt({
         field,
@@ -40,6 +41,13 @@ export async function POST(req: Request) {
       }),
       prompt: "开始本场面试,问出你的第一个问题。",
       temperature: 0.7,
+    });
+    await recordUsage({
+      endpoint: "session_open",
+      model,
+      promptTokens: usage.inputTokens ?? 0,
+      completionTokens: usage.outputTokens ?? 0,
+      sessionId: session.id,
     });
     const { dimension, cleanContent } = extractDimension(text);
     await prisma.turn.create({
@@ -51,7 +59,15 @@ export async function POST(req: Request) {
       },
     });
   } catch (err) {
-    // 开场失败也允许进入,UI 上可显示重试
+    await recordUsage({
+      endpoint: "session_open",
+      model,
+      promptTokens: 0,
+      completionTokens: 0,
+      sessionId: session.id,
+      ok: false,
+      errorMessage: (err as Error).message,
+    });
     await prisma.turn.create({
       data: {
         sessionId: session.id,

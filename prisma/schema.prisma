@@ -47,3 +47,29 @@ model Report {
   feedback   String
   createdAt  DateTime @default(now())
 }
+
+// 每次 LLM 调用的成本记录 - 用于实时监控花销
+// 灵感来自评分说明:"track spend on every run"
+model UsageLog {
+  id               String   @id @default(cuid())
+  // sample / session_open / chat / report
+  endpoint         String
+  // OpenRouter model id, e.g. "google/gemini-2.5-flash-lite"
+  model            String
+  promptTokens     Int
+  completionTokens Int
+  totalTokens      Int
+  // 按 lib/usage.ts 的 pricing table 估算的美元成本(乘以 1e6 存为整数微美元,
+  // 避免 SQLite 浮点累加误差)
+  costMicros       Int
+  // 关联到具体会话(报销分析 / 显示给用户)。sample 等无 session 的调用为 null。
+  sessionId        String?
+  // 调用是否成功 - 失败的也要记录(可能仍消耗少量 token)
+  ok               Boolean  @default(true)
+  errorMessage     String?
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([endpoint, createdAt])
+  @@index([sessionId])
+}

@@ -1,11 +1,12 @@
 import { streamText, convertToModelMessages, type UIMessage } from "ai";
-import { mainModel } from "@/lib/llm";
+import { mainModel, mainModelId } from "@/lib/llm";
 import { prisma } from "@/lib/db";
 import {
   buildInterviewerSystemPrompt,
   extractDimension,
   type Tier,
 } from "@/lib/prompts/interviewer";
+import { recordUsage } from "@/lib/usage";
 
 type Body = { messages: UIMessage[]; sessionId: string };
 
@@ -32,7 +33,6 @@ export async function POST(req: Request) {
     where: { sessionId, role: "interviewer" },
   });
 
-  // 持久化最新的候选人发言(取消息列表里最后一条 user message)
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   if (lastUser) {
     const text = uiMessageText(lastUser);
@@ -56,6 +56,7 @@ export async function POST(req: Request) {
     turnIndex: interviewerTurnCount,
   });
 
+  const model = mainModelId();
   const result = streamText({
     model: mainModel(),
     system,
@@ -72,8 +73,15 @@ export async function POST(req: Request) {
             dimension,
           },
         });
+        await recordUsage({
+          endpoint: "chat",
+          model,
+          promptTokens: event.totalUsage.inputTokens ?? 0,
+          completionTokens: event.totalUsage.outputTokens ?? 0,
+          sessionId,
+        });
       } catch (e) {
-        console.error("Failed to persist interviewer turn:", e);
+        console.error("chat onFinish persist failed:", e);
       }
     },
   });

@@ -1,8 +1,9 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import { mainModel } from "@/lib/llm";
+import { mainModel, mainModelId } from "@/lib/llm";
 import { prisma } from "@/lib/db";
 import { REPORT_SYSTEM_PROMPT, buildReportUserPrompt } from "@/lib/prompts/report";
+import { recordUsage } from "@/lib/usage";
 
 const Body = z.object({ sessionId: z.string().min(1) });
 
@@ -44,7 +45,6 @@ export async function POST(req: Request) {
     return Response.json({ error: "session_not_found" }, { status: 404 });
   }
 
-  // 已有报告则直接返回(幂等,节省 token)
   if (session.report) {
     return Response.json({
       report: JSON.parse(session.report.scoresJson),
@@ -59,8 +59,9 @@ export async function POST(req: Request) {
     );
   }
 
+  const model = mainModelId();
   try {
-    const { object } = await generateObject({
+    const { object, usage } = await generateObject({
       model: mainModel(),
       system: REPORT_SYSTEM_PROMPT,
       prompt: buildReportUserPrompt({
@@ -75,12 +76,29 @@ export async function POST(req: Request) {
       data: {
         sessionId,
         scoresJson: JSON.stringify(object),
-        feedback: "", // 兼容 schema 字段;主要内容在 scoresJson 里
+        feedback: "",
       },
+    });
+
+    await recordUsage({
+      endpoint: "report",
+      model,
+      promptTokens: usage.inputTokens ?? 0,
+      completionTokens: usage.outputTokens ?? 0,
+      sessionId,
     });
 
     return Response.json({ report: object });
   } catch (err) {
+    await recordUsage({
+      endpoint: "report",
+      model,
+      promptTokens: 0,
+      completionTokens: 0,
+      sessionId,
+      ok: false,
+      errorMessage: (err as Error).message,
+    });
     return Response.json(
       { error: "llm_error", message: (err as Error).message },
       { status: 500 },

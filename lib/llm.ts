@@ -21,9 +21,9 @@ const CONFIGS: Record<Provider, ProviderConfig> = {
     mainDefault: "anthropic/claude-sonnet-4.6",
     liteDefault: "anthropic/claude-haiku-4.5",
     headers: {
-      // OpenRouter requires HTTP-Referer for analytics/free-tier routing
-      "HTTP-Referer": "https://github.com/aiic-mock-interview",
-      "X-Title": "AI 保研复试·科研经历深挖",
+      // OpenRouter optional headers — must be ASCII (Latin-1) per HTTP spec.
+      "HTTP-Referer": "https://github.com/EriccirEgyz/AIIC_project",
+      "X-Title": "AIIC Mock Interview",
     },
   },
   deepseek: {
@@ -50,6 +50,37 @@ function getProvider(): Provider {
   throw new Error(`Unsupported LLM_PROVIDER: ${p}`);
 }
 
+/**
+ * OpenRouter 路由控制:从中国大陆调用时,默认路由会撞到 OpenAI 直连(被 CN 区拦)。
+ * 通过 body 里 provider.order 字段强制走 Azure(微软托管的 OpenAI,国内可达)。
+ *
+ * 通过逗号分隔的 OPENROUTER_PROVIDER_ORDER 自定义优先级,例如:
+ *   OPENROUTER_PROVIDER_ORDER="Azure,Fireworks"
+ */
+function makeOpenRouterFetch(): typeof fetch {
+  const orderRaw = process.env.OPENROUTER_PROVIDER_ORDER ?? "";
+  const order = orderRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return async (input, init) => {
+    if (init?.body && typeof init.body === "string" && order.length > 0) {
+      try {
+        const parsed = JSON.parse(init.body);
+        parsed.provider = {
+          order,
+          allow_fallbacks: false,
+          ...(parsed.provider ?? {}),
+        };
+        init = { ...init, body: JSON.stringify(parsed) };
+      } catch {
+        // Not JSON body — leave untouched.
+      }
+    }
+    return fetch(input, init);
+  };
+}
+
 function buildClient() {
   const provider = getProvider();
   const cfg = CONFIGS[provider];
@@ -66,6 +97,7 @@ function buildClient() {
       apiKey,
       baseURL: cfg.baseURL,
       headers: cfg.headers,
+      fetch: provider === "openrouter" ? makeOpenRouterFetch() : undefined,
     }),
   };
 }
@@ -79,14 +111,27 @@ function getClient() {
 
 /** Heavy reasoning: interviewer follow-up, report synthesis. */
 export function mainModel() {
-  const { cfg, client } = getClient();
-  return client(process.env[cfg.mainEnv] ?? cfg.mainDefault);
+  const { client } = getClient();
+  // Force chat-completions API; the default Responses API (input:) is not
+  // supported by Azure-hosted OpenAI, which is the only route reachable
+  // from mainland CN via OpenRouter.
+  return client.chat(mainModelId());
 }
 
 /** Cheap/fast: sample experience generation, dimension classification. */
 export function liteModel() {
-  const { cfg, client } = getClient();
-  return client(process.env[cfg.liteEnv] ?? cfg.liteDefault);
+  const { client } = getClient();
+  return client.chat(liteModelId());
+}
+
+export function mainModelId(): string {
+  const { cfg } = getClient();
+  return process.env[cfg.mainEnv] ?? cfg.mainDefault;
+}
+
+export function liteModelId(): string {
+  const { cfg } = getClient();
+  return process.env[cfg.liteEnv] ?? cfg.liteDefault;
 }
 
 export function currentProvider(): Provider {
