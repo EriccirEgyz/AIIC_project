@@ -30,6 +30,8 @@ const Body = z
     // 兼容 string(老调用) 和 string[](新多选 UI)
     weaknessFocus: z.string().min(1).max(500).optional(),
     weaknessFocuses: z.array(z.string().min(1).max(500)).max(10).optional(),
+    // 期望问答轮数: 5/10/15 (短/中/长), 默认 10
+    targetTurns: z.number().int().min(3).max(30).optional(),
   })
   .refine(
     (data) => {
@@ -66,6 +68,7 @@ export async function POST(req: Request) {
     images,
     weaknessFocus,
     weaknessFocuses,
+    targetTurns,
   } = parsed.data;
   // 归一化: 老 UI 传 weaknessFocus, 新 UI 传 weaknessFocuses, 合并去重
   const allFocuses = [
@@ -86,6 +89,7 @@ export async function POST(req: Request) {
           : "[暂无文字经历, 等待材料摘要]",
       field,
       targetTier,
+      ...(targetTurns !== undefined ? { targetTurns } : {}),
     },
   });
 
@@ -143,6 +147,7 @@ export async function POST(req: Request) {
         field,
         experience: effectiveExperience,
         turnIndex: 0,
+        targetTurns: targetTurns ?? 10,
         weaknessFocuses: dedupedFocuses,
       }),
       prompt: "开始本场面试,问出你的第一个问题。",

@@ -19,6 +19,12 @@ const MAX_RESUME_PAGES = 5;
 const MAX_PPT_PAGES = 20;
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 
+const LENGTH_OPTIONS = [
+  { value: 5, label: "短 · 约 5 轮", hint: "快速过,只挖最关键" },
+  { value: 10, label: "中 · 约 10 轮", hint: "一场完整复盘(默认)" },
+  { value: 15, label: "长 · 约 15 轮", hint: "完整复试模拟,多项目深挖" },
+] as const;
+
 type Slot = "resume" | "ppt";
 
 const SLOT_META: Record<
@@ -41,6 +47,7 @@ export default function ExperienceForm() {
   const router = useRouter();
   const [fieldChoice, setFieldChoice] = useState<string>(FIELD_PRESETS[0]);
   const [customField, setCustomField] = useState("");
+  const [targetTurns, setTargetTurns] = useState<number>(10);
   const [experience, setExperience] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [genLoading, setGenLoading] = useState(false);
@@ -167,7 +174,7 @@ export default function ExperienceForm() {
     }
     startTransition(async () => {
       try {
-        const body: Record<string, unknown> = { field };
+        const body: Record<string, unknown> = { field, targetTurns };
         if (experience.trim()) body.experience = experience.trim();
         if (resume && resume.pages.length > 0) {
           body.resumeImages = resume.pages.map((p) => ({ dataUrl: p.dataUrl }));
@@ -213,36 +220,56 @@ export default function ExperienceForm() {
       onSubmit={startInterview}
       className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 sm:p-8 shadow-sm space-y-6"
     >
-      <label className="block">
-        <span className="text-sm font-medium">目标导师方向</span>
-        <select
-          value={fieldChoice}
-          onChange={(e) => setFieldChoice(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
-        >
-          {FIELD_PRESETS.map((f) => (
-            <option key={f} value={f}>
-              {f}
-            </option>
-          ))}
-          <option value={FIELD_CUSTOM}>其他(自定义)…</option>
-        </select>
-        {fieldChoice === FIELD_CUSTOM && (
-          <input
-            type="text"
-            value={customField}
-            onChange={(e) => setCustomField(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
-            placeholder="如 AI for Science / 类脑计算 / 神经辐射场"
-            maxLength={60}
-            autoFocus
-            required
-          />
-        )}
-        <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-          你想申请的导师所在的研究方向。AI 会按"这位导师"的视角追问你。
-        </p>
-      </label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label className="block">
+          <span className="text-sm font-medium">目标导师方向</span>
+          <select
+            value={fieldChoice}
+            onChange={(e) => setFieldChoice(e.target.value)}
+            className="mt-1.5 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+          >
+            {FIELD_PRESETS.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+            <option value={FIELD_CUSTOM}>其他(自定义)…</option>
+          </select>
+          {fieldChoice === FIELD_CUSTOM && (
+            <input
+              type="text"
+              value={customField}
+              onChange={(e) => setCustomField(e.target.value)}
+              className="mt-2 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+              placeholder="如 AI for Science / 类脑计算 / 神经辐射场"
+              maxLength={60}
+              autoFocus
+              required
+            />
+          )}
+          <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+            你想申请的导师所在的研究方向。AI 会按"这位导师"的视角追问你。
+          </p>
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-medium">本场时长</span>
+          <select
+            value={targetTurns}
+            onChange={(e) => setTargetTurns(Number(e.target.value))}
+            className="mt-1.5 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+          >
+            {LENGTH_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label} — {o.hint}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+            预期问答轮数。AI 会按这个预算分配节奏:多项目时自动轮转,接近尾声时收尾。
+          </p>
+        </label>
+      </div>
 
       {/* 提示: 至少要有文字 或 简历 */}
       <div className="rounded-lg bg-zinc-100 dark:bg-zinc-800/60 px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">

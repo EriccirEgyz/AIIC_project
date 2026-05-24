@@ -16,8 +16,10 @@ model Session {
   experience String
   // 研究领域,供面试官调用专业语境(如 "计算机视觉" / "凝聚态物理")
   field      String
-  // 目标院校层次,决定追问犀利程度 ("top5" / "top10" / "211")
+  // 目标院校层次 - 已从 UI 下线但 DB 列保留作 backward compat (always "top5")
   targetTier String   @default("top5")
+  // 预期问答轮数: 短 5 / 中 10 / 长 15 - 用于动态调整面试节奏
+  targetTurns Int     @default(10)
   createdAt  DateTime @default(now())
   turns      Turn[]
   report     Report?

@@ -52,6 +52,7 @@ export async function POST(req: Request) {
     field: session.field,
     experience: session.experience,
     turnIndex: interviewerTurnCount,
+    targetTurns: session.targetTurns,
   });
 
   const model = mainModelId();

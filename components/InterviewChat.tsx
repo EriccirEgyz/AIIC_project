@@ -27,11 +27,14 @@ export default function InterviewChat({
   sessionId,
   initialMessages,
   readOnly = false,
+  targetTurns = 10,
 }: {
   sessionId: string;
   initialMessages: UIMessage[];
   /** 报告已生成时为 true:只渲染历史消息,隐藏输入区 */
   readOnly?: boolean;
+  /** 用户创建会话时选的预期轮数(短 5 / 中 10 / 长 15),用于 UI 引导 */
+  targetTurns?: number;
 }) {
   const router = useRouter();
   const [input, setInput] = useState("");
@@ -75,6 +78,7 @@ export default function InterviewChat({
   const isBusy = status === "submitted" || status === "streaming";
   const interviewerTurns = messages.filter((m) => m.role === "assistant").length;
   const canFinish = interviewerTurns >= 3;
+  const overBudget = interviewerTurns >= targetTurns;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -295,14 +299,27 @@ export default function InterviewChat({
                     ? "结束面试并生成反馈报告"
                     : `至少完成 3 轮追问 (当前 ${interviewerTurns}/3)`
                 }
-                className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 transition-colors whitespace-nowrap"
+                className={`rounded-lg px-4 py-2 text-xs disabled:opacity-40 transition-colors whitespace-nowrap ${
+                  overBudget && canFinish
+                    ? "bg-amber-500 hover:bg-amber-600 text-white border border-amber-500 font-medium animate-pulse"
+                    : "border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                }`}
               >
                 {reportLoading ? "生成中…" : "结束 · 看报告"}
               </button>
             </div>
           </form>
-          <p className="mt-2 text-xs text-zinc-400">
-            已完成 {interviewerTurns} 轮追问 · 建议 5-8 轮后生成报告
+          <p
+            className={`mt-2 text-xs ${
+              overBudget
+                ? "text-amber-600 dark:text-amber-400 font-medium"
+                : "text-zinc-400"
+            }`}
+          >
+            已完成 {interviewerTurns} / 约 {targetTurns} 轮
+            {overBudget
+              ? " · 已达本场预期长度,建议点右侧「结束 · 看报告」"
+              : ` · 完成约 ${targetTurns} 轮后可结束并生成报告`}
           </p>
         </div>
       </div>

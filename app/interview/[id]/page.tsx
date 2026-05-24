@@ -48,6 +48,7 @@ export default async function InterviewPage({ params }: { params: Params }) {
         sessionId={id}
         initialMessages={initialMessages}
         readOnly={isReadOnly}
+        targetTurns={session.targetTurns}
       />
     </main>
   );
