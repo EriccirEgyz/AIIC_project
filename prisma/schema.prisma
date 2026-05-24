@@ -1,0 +1,49 @@
+// AI 保研复试·科研经历深挖
+// 三张表:Session(一次模拟面试) / Turn(一轮问答) / Report(最终反馈)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  // 用户粘贴或 AI 生成的科研经历原文
+  experience String
+  // 研究领域,供面试官调用专业语境(如 "计算机视觉" / "凝聚态物理")
+  field      String
+  // 目标院校层次,决定追问犀利程度 ("top5" / "top10" / "211")
+  targetTier String   @default("top5")
+  createdAt  DateTime @default(now())
+  turns      Turn[]
+  report     Report?
+}
+
+model Turn {
+  id        String   @id @default(cuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  // 'interviewer' 由 LLM 产出, 'candidate' 由用户输入
+  role      String
+  content   String
+  // 追问命中的维度: motivation / method / data / failure / reflection
+  dimension String?
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  sessionId  String   @unique
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  // 五维度评分 JSON: { motivation, method, data, failure, reflection } 0-10
+  scoresJson String
+  // markdown 反馈正文(优势/薄弱点/改进建议/示范答法)
+  feedback   String
+  createdAt  DateTime @default(now())
+}
