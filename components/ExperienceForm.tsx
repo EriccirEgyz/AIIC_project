@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { renderPdfToImages, type RenderedPage } from "@/lib/pdf-render";
 
@@ -27,12 +27,12 @@ const SLOT_META: Record<
 > = {
   resume: {
     title: "简历 PDF",
-    hint: "申请的导师会看到你的简历 — 教育背景 / 项目列表 / 奖项",
+    hint: "目标导师面试前会先翻你的简历 — 教育背景、项目列表、奖项。",
     maxPages: MAX_RESUME_PAGES,
   },
   ppt: {
-    title: "科研 PPT PDF",
-    hint: "想让 AI 看到你 PPT 里的实验图、方法图、关键数字 — 真实复试导师就这么看",
+    title: "项目演示 PPT",
+    hint: "让 AI 像导师那样翻看你的实验图、方法图和关键数字。",
     maxPages: MAX_PPT_PAGES,
   },
 };
@@ -55,8 +55,22 @@ export default function ExperienceForm() {
     null,
   );
   const [rendering, setRendering] = useState<Slot | null>(null);
+  const [elapsedSec, setElapsedSec] = useState(0);
   const resumeRef = useRef<HTMLInputElement>(null);
   const pptRef = useRef<HTMLInputElement>(null);
+
+  // 提交后开始计时,让用户看到进度
+  useEffect(() => {
+    if (!isPending) {
+      setElapsedSec(0);
+      return;
+    }
+    const start = Date.now();
+    const id = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isPending]);
 
   const field =
     fieldChoice === FIELD_CUSTOM ? customField.trim() : fieldChoice;
@@ -107,7 +121,9 @@ export default function ExperienceForm() {
     if (!file) return;
     const { maxPages, title } = SLOT_META[slot];
     if (file.type !== "application/pdf") {
-      setError(`${title} 只支持 PDF 文件(PPT 请先导出 PDF)`);
+      setError(
+        `${title} 只支持 PDF 文件(PowerPoint 请先「另存为 PDF」)`,
+      );
       return;
     }
     if (file.size > MAX_PDF_BYTES) {
@@ -146,9 +162,7 @@ export default function ExperienceForm() {
       return;
     }
     if (!hasEnoughContent()) {
-      setError(
-        "请至少填写一段科研经历(20 字以上)或上传简历 PDF — 两者必须有一项",
-      );
+      setError("请至少填写一段科研经历(20 字以上)或上传简历 PDF。");
       return;
     }
     startTransition(async () => {
@@ -175,12 +189,23 @@ export default function ExperienceForm() {
     });
   }
 
+  const pageInfo = (() => {
+    const r = resume?.pages.length ?? 0;
+    const p = ppt?.pages.length ?? 0;
+    if (r && p) return `简历 ${r} 页 + 项目演示 PPT ${p} 页`;
+    if (r) return `简历 ${r} 页`;
+    if (p) return `项目演示 PPT ${p} 页`;
+    return "";
+  })();
+  const hasMaterials = pageInfo.length > 0;
+
   const submitLabel = (() => {
     if (!isPending) return "开始模拟追问 →";
-    const hasPpt = ppt && ppt.pages.length > 0;
-    const hasResume = resume && resume.pages.length > 0;
-    if (hasPpt || hasResume) return "导师正在翻你的材料…";
-    return "正在为你叫醒一位 985 导师…";
+    const tick = elapsedSec > 0 ? ` · ${elapsedSec}s` : "";
+    if (hasMaterials) {
+      return `导师正在翻你的材料(${pageInfo})…${tick}`;
+    }
+    return `正在为你叫醒一位 985 导师…${tick}`;
   })();
 
   return (
@@ -221,21 +246,18 @@ export default function ExperienceForm() {
 
       {/* 提示: 至少要有文字 或 简历 */}
       <div className="rounded-lg bg-zinc-100 dark:bg-zinc-800/60 px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-        下面三块材料,
+        下面三项内容,
         <strong className="text-zinc-900 dark:text-zinc-100">
           「科研经历正文」和「简历 PDF」至少有一个
         </strong>
-        ;PPT PDF 完全可选(但上传后追问会更深入)。
+        ;项目演示 PPT 完全可选(上传后追问会更具体)。
       </div>
 
       {/* 文字经历 */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label htmlFor="exp" className="text-sm font-medium">
-            科研经历正文{" "}
-            <span className="text-xs font-normal text-zinc-400">
-              (可选 · 至少 20 字)
-            </span>
+            科研经历正文
           </label>
           <button
             type="button"
@@ -253,7 +275,7 @@ export default function ExperienceForm() {
           rows={8}
           maxLength={8000}
           className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 resize-y"
-          placeholder={`粘贴或直接写下你的一段科研经历，200-500 字最佳。包含：\n  · 课题是什么\n  · 你负责的部分\n  · 用了什么方法\n  · 拿到什么结果`}
+          placeholder={`粘贴或直接写下你的科研经历，包含：\n  · 课题是什么\n  · 你负责的部分\n  · 用了什么方法\n  · 拿到什么结果`}
         />
         <div className="mt-1 text-xs text-zinc-400 text-right">
           {experience.length} / 8000
@@ -289,6 +311,11 @@ export default function ExperienceForm() {
       >
         {submitLabel}
       </button>
+      {isPending && hasMaterials && (
+        <p className="text-center text-xs text-zinc-500 dark:text-zinc-400 -mt-2">
+          AI 正在逐页阅读 — 通常 10-30 秒,大 PDF 文件可能更久。请耐心等待。
+        </p>
+      )}
     </form>
   );
 }
@@ -312,10 +339,7 @@ function PdfSlot({
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-sm font-medium">
-          {meta.title}{" "}
-          <span className="text-xs font-normal text-zinc-400">(可选)</span>
-        </span>
+        <span className="text-sm font-medium">{meta.title}</span>
         {state && (
           <button
             type="button"
@@ -344,7 +368,7 @@ function PdfSlot({
       )}
       {rendering && (
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 px-4 py-5 text-center text-sm text-zinc-500 animate-pulse">
-          正在渲染 PDF 页面…
+          正在加载预览…
         </div>
       )}
       {state && state.pages.length > 0 && (

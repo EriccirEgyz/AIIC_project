@@ -27,14 +27,12 @@ export default function Home() {
         </p>
         <ul className="mt-5 text-sm text-zinc-500 dark:text-zinc-400 space-y-1.5">
           <li>
-            · 不是聊天，是
-            <span className="text-rose-600 dark:text-rose-400">
-              基于你原文细节的定向追问
-            </span>
-            （会引用具体数字 / 模型名 / 数据集）
+            · 不是聊天，是基于你材料细节的定向追问（会落实到具体数字 /
+            模型名 / 数据集 / PPT 图表）
           </li>
           <li>
-            · 内置 AI 领域真实评审 norms：ablation / baseline / 统计显著性 / 复现性
+            · 内置顶会审稿人最常挖的角度：选题动机 / ablation / baseline /
+            显著性 / 复现性
           </li>
           <li>
             · 不给鼓励，只给「真实 AI 方向导师此刻会追问什么 / 你被刷的硬伤在哪」
