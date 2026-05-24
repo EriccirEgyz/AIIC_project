@@ -69,8 +69,15 @@ export function buildInterviewerSystemPrompt(opts: {
   experience: string;
   targetTier: Tier;
   turnIndex: number; // 0-based:下一条 interviewer 消息是第几轮
+  /**
+   * 用户主动指定的"本场重点挖的薄弱点"。
+   * 可以是项目级别的具体点("baseline 选得弱"),
+   * 也可以是宏观认知层面的("对 transformer 训练范式不理解")。
+   * 模型应该围绕它组织所有追问 —— 即使原经历里没明显信号。
+   */
+  weaknessFocus?: string;
 }) {
-  const { field, experience, targetTier, turnIndex } = opts;
+  const { field, experience, targetTier, turnIndex, weaknessFocus } = opts;
   const stage =
     turnIndex < 2
       ? "开场阶段:先让候选人简要介绍这段经历,问开放性问题(如 '能先用 2 分钟讲一下你这个项目的整体情况吗?' 或 '你在这个项目里具体负责什么部分?')"
@@ -78,13 +85,27 @@ export function buildInterviewerSystemPrompt(opts: {
         ? "深挖阶段:进入具体细节,挑一个之前答得模糊或可疑的点定向追问,不要切换大话题。优先用弹药库里的红旗信号判断挖哪里。"
         : "批判阶段:开始质疑方法选择 / 结果可信度 / 候选人对原理的理解深度。可以引入对比方案、反例、边界情况,或者直接质疑某个数字是否经得起方差检验。";
 
+  const focusBlock = weaknessFocus
+    ? `
+
+【⚠ 本场用户主动指定的重点薄弱点】
+"""
+${weaknessFocus}
+"""
+请把所有追问围绕这个薄弱点展开 —— 即使原经历里没明显信号,也要主动设计能暴露这个弱点的问题。
+- 如果是项目级别的弱点(如"baseline 选得弱"),用弹药库相应红旗去深挖原经历的对应环节
+- 如果是宏观认知层面的弱点(如"对 transformer 训练范式不熟悉"),可以脱离原经历,直接问该领域的概念性问题(架构原理、训练 trick、典型论文等),倒逼候选人暴露知识盲区
+- 即使候选人答得不错,也要继续就这个薄弱点深挖至少 5-6 轮再考虑切换话题
+`
+    : "";
+
   return `你是一位 ${field} 方向的资深研究生导师。一位想加入你课题组的本科生正在向你做保研复试展示。
 
 【重要】你的研究方向是 ${field}。候选人提交的经历**可能不是这个方向**(常见情况:CV 学生申你的 NLP 组、做推荐的来申 LLM 组)。当出现跨方向时:
 - 不要假装这就是 ${field} 项目
 - 优先追问"这段经历里有哪些技能/方法可以迁移到 ${field}"
 - 如果候选人完全没有 ${field} 相关基础,直接问 ta 对 ${field} 的兴趣和阅读积累
-
+${focusBlock}
 【你的风格】
 ${TIER_STYLE[targetTier]}
 

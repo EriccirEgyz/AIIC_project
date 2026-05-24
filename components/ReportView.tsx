@@ -15,13 +15,23 @@ const DIM_LABELS: { key: keyof ReportJson["scores"]; label: string }[] = [
 export default function ReportView({
   report,
   sessionId,
+  originalExperience,
+  originalField,
 }: {
   report: ReportJson | null;
   sessionId: string;
+  /** 原会话的 experience(已合并 vision 摘要),用于"针对薄弱点再练"时复用上下文 */
+  originalExperience: string;
+  originalField: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // "针对薄弱点再练一轮" 相关
+  const [focusingOn, setFocusingOn] = useState<string | null>(null);
+  const [customFocus, setCustomFocus] = useState("");
+  const [focusError, setFocusError] = useState<string | null>(null);
 
   async function generate() {
     setError(null);
@@ -39,6 +49,34 @@ export default function ReportView({
       setError((e as Error).message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function practiceOn(weakness: string) {
+    const text = weakness.trim();
+    if (!text) {
+      setFocusError("请输入一个薄弱点");
+      return;
+    }
+    setFocusError(null);
+    setFocusingOn(text);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          experience: originalExperience,
+          field: originalField,
+          weaknessFocus: text,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(data.message ?? data.error ?? "创建新一轮失败");
+      router.push(`/interview/${data.sessionId}`);
+    } catch (e) {
+      setFocusError((e as Error).message);
+      setFocusingOn(null);
     }
   }
 
@@ -61,6 +99,8 @@ export default function ReportView({
       </div>
     );
   }
+
+  const isBusy = focusingOn !== null;
 
   return (
     <div className="space-y-8">
@@ -101,11 +141,22 @@ export default function ReportView({
         </ul>
       </Section>
 
-      <Section title="⚠ 薄弱点（按严重度）" tone="amber">
-        <ol className="space-y-2 list-decimal list-inside">
+      <Section title="⚠ 薄弱点(按严重度) — 点右侧按钮可针对它再练一轮" tone="amber">
+        <ol className="space-y-3 list-decimal list-inside">
           {report.weaknesses.map((w, i) => (
-            <li key={i} className="text-sm leading-6">
-              {w}
+            <li
+              key={i}
+              className="text-sm leading-6 flex items-start justify-between gap-3"
+            >
+              <span className="flex-1">{w}</span>
+              <button
+                type="button"
+                onClick={() => practiceOn(w)}
+                disabled={isBusy}
+                className="shrink-0 text-xs rounded-md border border-amber-400/50 dark:border-amber-500/40 bg-white/70 dark:bg-amber-950/30 px-2.5 py-1 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-40 transition-colors"
+              >
+                {focusingOn === w ? "准备中…" : "针对这点再练一轮 →"}
+              </button>
             </li>
           ))}
         </ol>
@@ -129,6 +180,40 @@ export default function ReportView({
             </div>
           ))}
         </div>
+      </Section>
+
+      {/* 自定义薄弱点再练 — 支持宏观认知层面的弱点 */}
+      <Section title="🎯 想针对其他薄弱点再练?" tone="sky">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 leading-6">
+          支持具体项目细节(如 "baseline 选得弱"),也支持宏观认知层面(如
+          "对 transformer 训练范式不熟悉")—— AI 会专门挖你说的这个点。
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={customFocus}
+            onChange={(e) => setCustomFocus(e.target.value)}
+            placeholder="如 对所做领域的宏观认识不足 / 对 ablation 的设计思路不熟悉"
+            maxLength={500}
+            disabled={isBusy}
+            className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={() => practiceOn(customFocus)}
+            disabled={isBusy || !customFocus.trim()}
+            className="shrink-0 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 text-sm font-medium disabled:opacity-40"
+          >
+            {focusingOn && focusingOn === customFocus.trim()
+              ? "准备中…"
+              : "针对这点再练一轮 →"}
+          </button>
+        </div>
+        {focusError && (
+          <p className="text-sm text-rose-600 dark:text-rose-400 mt-2">
+            ⚠ {focusError}
+          </p>
+        )}
       </Section>
 
       <div className="flex gap-3 pt-4">
@@ -194,9 +279,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section
-      className={`rounded-2xl border p-5 ${TONE_BG[tone]}`}
-    >
+    <section className={`rounded-2xl border p-5 ${TONE_BG[tone]}`}>
       <h2 className="text-sm font-semibold mb-3">{title}</h2>
       {children}
     </section>

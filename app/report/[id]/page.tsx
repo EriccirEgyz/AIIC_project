@@ -47,11 +47,12 @@ export default async function ReportPage({ params }: { params: Params }) {
         <h1 className="text-2xl sm:text-3xl font-semibold mt-2 mb-6">
           {session.field} 导师追问总结
         </h1>
-        {report ? (
-          <ReportView report={report} sessionId={id} />
-        ) : (
-          <ReportView report={null} sessionId={id} />
-        )}
+        <ReportView
+          report={report}
+          sessionId={id}
+          originalExperience={session.experience}
+          originalField={session.field}
+        />
       </div>
     </main>
   );
