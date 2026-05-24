@@ -167,8 +167,13 @@ export default function ReportView({
         </ul>
       </Section>
 
-      <Section title="⚠ 薄弱点(按严重度) — 勾选若干条进入下方再练一轮" tone="amber">
-        <ul className="space-y-2.5">
+      {/* 弱点 + 再练一轮合并成一块,避免用户勾选后还要滚过长的"改进示范" 才看到按钮 */}
+      <Section title="⚠ 薄弱点 + 针对性再练一轮" tone="amber">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3 leading-6">
+          勾选 AI 检测出的薄弱点,可叠加自填弱点(支持宏观认知如"对 transformer
+          训练范式不熟"),一键开新会话定向深挖。
+        </p>
+        <ul className="space-y-2.5 mb-4">
           {report.weaknesses.map((w, i) => (
             <li key={i}>
               <label className="flex items-start gap-2.5 cursor-pointer group">
@@ -186,39 +191,14 @@ export default function ReportView({
             </li>
           ))}
         </ul>
-      </Section>
-
-      <Section title="🎯 可执行改进 — 附示范答法" tone="sky">
-        <div className="space-y-5">
-          {report.improvements.map((imp, i) => (
-            <div
-              key={i}
-              className="border-l-2 border-sky-400 dark:border-sky-600 pl-4"
-            >
-              <p className="text-sm font-medium">{imp.issue}</p>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1 leading-6">
-                {imp.suggestion}
-              </p>
-              <div className="mt-2 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 px-3 py-2">
-                <p className="text-[11px] text-zinc-500 mb-1">示范回答</p>
-                <p className="text-sm leading-6">{imp.exampleAnswer}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* 自定义薄弱点 + 聚合再练一轮按钮 */}
-      <Section title="🎯 再练一轮 — 上方可勾选 + 这里可自己补充" tone="sky">
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 leading-6">
-          支持项目细节(如 "baseline 选得弱"),也支持宏观认知(如 "对
-          transformer 训练范式不熟")。<strong>每行一条</strong>,留空就只用上方勾选的。
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">
+          自填薄弱点 <span className="text-zinc-400">(每行一条,留空就只用上方勾选的)</span>
         </p>
         <textarea
           value={customText}
           onChange={(e) => setCustomText(e.target.value)}
           placeholder={`如:\n对所做领域的宏观认识不足\n对 ablation 的设计思路不熟悉`}
-          rows={4}
+          rows={3}
           maxLength={2000}
           disabled={focusLoading}
           className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-50 resize-y"
@@ -240,6 +220,26 @@ export default function ReportView({
               ? "请先勾选或写入至少一个薄弱点"
               : `针对选中的 ${focusCount} 个薄弱点再练一轮 →`}
         </button>
+      </Section>
+
+      <Section title="🎯 可执行改进 — 附示范答法" tone="sky">
+        <div className="space-y-5">
+          {report.improvements.map((imp, i) => (
+            <div
+              key={i}
+              className="border-l-2 border-sky-400 dark:border-sky-600 pl-4"
+            >
+              <p className="text-sm font-medium">{imp.issue}</p>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1 leading-6">
+                {imp.suggestion}
+              </p>
+              <div className="mt-2 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 px-3 py-2">
+                <p className="text-[11px] text-zinc-500 mb-1">示范回答</p>
+                <p className="text-sm leading-6">{imp.exampleAnswer}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </Section>
 
       <div className="flex gap-3 pt-4">

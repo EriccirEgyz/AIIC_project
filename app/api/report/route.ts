@@ -17,7 +17,9 @@ const ReportSchema = z.object({
   }),
   overall: z.number().min(0).max(10),
   strengths: z.array(z.string()).max(6),
-  weaknesses: z.array(z.string()).max(4),
+  // bump 4 -> 6: ReportView 改成 checkbox 多选后,4 个上限会让用户选不够,
+  // 而真实复试 5-6 个薄弱点很常见
+  weaknesses: z.array(z.string()).max(6),
   improvements: z
     .array(
       z.object({
@@ -26,7 +28,7 @@ const ReportSchema = z.object({
         exampleAnswer: z.string(),
       }),
     )
-    .max(5),
+    .max(6),
   redFlags: z.array(z.string()).max(4),
 });
 

@@ -15,15 +15,19 @@ export default function Home() {
         <p className="mt-4 text-zinc-600 dark:text-zinc-400 leading-7">
           专为想保研到
           <strong className="text-zinc-900 dark:text-zinc-100">人工智能方向</strong>
-          的本科生设计：粘贴你的一段科研经历，模拟导师按
+          的本科生设计：上传你的{" "}
+          <strong className="text-zinc-900 dark:text-zinc-100">
+            科研经历 / 简历 PDF / 项目演示 PPT
+          </strong>
+          ，AI 像导师那样逐页翻看并按
           <strong className="text-zinc-900 dark:text-zinc-100">
             「动机 / 方法 / 数据 / 困难 / 反思」
           </strong>
-          五维度连续追问 5-10 轮，结束后输出
-          <strong className="text-zinc-900 dark:text-zinc-100">
-            可执行反馈报告
-          </strong>
-          ：薄弱点、红旗、示范答法。
+          五维度连续追问（支持
+          <strong className="text-zinc-900 dark:text-zinc-100">🎤 语音回答</strong>
+          ，还原复试紧张感），结束后输出
+          <strong className="text-zinc-900 dark:text-zinc-100">可执行反馈报告</strong>
+          ，并可针对任一薄弱点再练一轮。
         </p>
         <ul className="mt-5 text-sm text-zinc-500 dark:text-zinc-400 space-y-1.5">
           <li>
@@ -43,7 +47,7 @@ export default function Home() {
         <ExperienceForm />
       </section>
       <footer className="mt-auto py-8 text-center text-xs text-zinc-400">
-        北大 AIIC 16h Challenge · 2026-05-24 · powered by Qwen Plus
+        北大 AIIC 16h Challenge · 2026-05-24 · Qwen Plus + Qwen3.6 Vision + 火山 ASR
       </footer>
     </main>
   );
