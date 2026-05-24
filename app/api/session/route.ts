@@ -8,63 +8,113 @@ import {
   type Tier,
 } from "@/lib/prompts/interviewer";
 import { recordUsage } from "@/lib/usage";
-import { summarizeResumeImages } from "@/lib/vision";
+import { summarizeMaterials, type LabeledImage } from "@/lib/vision";
 
-// targetTier 在 UI 上已下线,但 DB 列仍存在(默认 top5)。保留 zod 兜底
-// 是为了 backward compat — 任何老 client 还能跑通。
-//
-// images: optional, 客户端 pdfjs-dist 渲染好的简历/PPT 页面 PNG (data URL).
-// 限制 5 页防止 vision 调用超载。
-const Body = z.object({
-  experience: z.string().min(20, "经历至少 20 字").max(8000),
-  field: z.string().min(1).max(60),
-  targetTier: z.enum(["top5", "top10", "211"]).default("top5"),
-  images: z
-    .array(z.object({ dataUrl: z.string().startsWith("data:image/") }))
-    .max(5)
-    .optional(),
+// 验证规则: 必须 至少一个 {experience 文本 >=20 字, resumeImages 至少 1 页}
+// PPT 完全可选。
+// 服务端兜底校验, 防止有人绕过前端直接 POST。
+const ImagePage = z.object({
+  dataUrl: z.string().startsWith("data:image/"),
 });
+
+const Body = z
+  .object({
+    experience: z.string().max(8000).optional(),
+    field: z.string().min(1).max(60),
+    targetTier: z.enum(["top5", "top10", "211"]).default("top5"),
+    // 向后兼容: 旧 client 传 `images` 字段
+    images: z.array(ImagePage).max(5).optional(),
+    resumeImages: z.array(ImagePage).max(5).optional(),
+    pptImages: z.array(ImagePage).max(20).optional(),
+  })
+  .refine(
+    (data) => {
+      const hasText = (data.experience?.trim().length ?? 0) >= 20;
+      const hasResume =
+        (data.resumeImages?.length ?? 0) > 0 ||
+        (data.images?.length ?? 0) > 0;
+      return hasText || hasResume;
+    },
+    {
+      message: "请至少提供一段科研经历正文(20 字以上)或上传简历 PDF",
+      path: ["experience"],
+    },
+  );
 
 export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) {
     return Response.json(
-      { error: "invalid_body", issues: parsed.error.issues },
+      {
+        error: "invalid_body",
+        message: parsed.error.issues[0]?.message ?? "请求格式错误",
+        issues: parsed.error.issues,
+      },
       { status: 400 },
     );
   }
-  const { experience, field, targetTier, images } = parsed.data;
+  const { experience, field, targetTier, resumeImages, pptImages, images } =
+    parsed.data;
 
-  // 1) 先创建会话(占位,得到 sessionId)
+  // 1) 先创建会话, 占位 experience 用空字符串(后续可能被材料摘要替换/补充)
+  const initialExperience = experience?.trim() ?? "";
   const session = await prisma.session.create({
-    data: { experience, field, targetTier },
+    data: {
+      experience:
+        initialExperience.length >= 20
+          ? initialExperience
+          : "[暂无文字经历, 等待材料摘要]",
+      field,
+      targetTier,
+    },
   });
 
-  // 2) 如果上传了简历图片,先把图片摘要成文字,合并进 experience
-  let effectiveExperience = experience;
-  if (images && images.length > 0) {
+  // 2) 如果有任何图片材料(简历/PPT/兼容 images), 调 vision 合并摘要
+  // 兼容: 旧 client 传 images, 视为简历
+  const labeledImages: LabeledImage[] = [];
+  const resumeList = resumeImages ?? images ?? [];
+  resumeList.forEach((img, i) => {
+    labeledImages.push({
+      dataUrl: img.dataUrl,
+      pageNumber: i + 1,
+      kind: "resume",
+    });
+  });
+  (pptImages ?? []).forEach((img, i) => {
+    labeledImages.push({
+      dataUrl: img.dataUrl,
+      pageNumber: i + 1,
+      kind: "ppt",
+    });
+  });
+
+  let effectiveExperience = initialExperience;
+  if (labeledImages.length > 0) {
     try {
-      const { summary } = await summarizeResumeImages({
-        images,
+      const { summary } = await summarizeMaterials({
+        images: labeledImages,
         field,
-        experienceHint: experience,
+        experienceHint: initialExperience || undefined,
         sessionId: session.id,
       });
       if (summary) {
-        effectiveExperience = `${experience}\n\n【候选人上传的简历/PPT 内容摘要 (${images.length} 页)】\n${summary}`;
-        // 持久化到 experience,后续 chat / report 自动拿到
+        const header = initialExperience
+          ? `${initialExperience}\n\n【候选人上传的材料 AI 摘要】\n${summary}`
+          : `【候选人未填写文字经历,以下为上传材料的 AI 摘要】\n${summary}`;
+        effectiveExperience = header;
         await prisma.session.update({
           where: { id: session.id },
           data: { experience: effectiveExperience },
         });
       }
     } catch (err) {
-      // 视觉调用失败不应阻塞面试,记一个 turn 提示一下即可
       console.error("vision summarization failed:", err);
+      // 视觉失败但有文字: 继续走文字流程
+      // 视觉失败且无文字: experience 会是占位串, 面试官会被迫开场问 "请先讲讲你做了什么"
     }
   }
 
-  // 3) 生成开场问题(纯文本,使用合并后的 experience)
+  // 3) 生成开场问题
   const model = mainModelId();
   try {
     const { text, usage } = await generateText({
