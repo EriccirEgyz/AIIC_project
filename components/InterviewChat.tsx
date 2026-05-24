@@ -26,9 +26,12 @@ type RecState = "idle" | "recording" | "transcribing";
 export default function InterviewChat({
   sessionId,
   initialMessages,
+  readOnly = false,
 }: {
   sessionId: string;
   initialMessages: UIMessage[];
+  /** 报告已生成时为 true:只渲染历史消息,隐藏输入区 */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [input, setInput] = useState("");
@@ -182,6 +185,17 @@ export default function InterviewChat({
 
   return (
     <div className="flex-1 flex flex-col">
+      {readOnly && (
+        <div className="bg-sky-50 dark:bg-sky-950/30 border-b border-sky-200 dark:border-sky-900/50 px-6 py-2.5 text-sm text-sky-900 dark:text-sky-100 text-center">
+          本场对话已结束 · 只读模式 ·{" "}
+          <a
+            href={`/report/${sessionId}`}
+            className="underline font-medium hover:text-sky-700 dark:hover:text-sky-200"
+          >
+            回到反馈报告 →
+          </a>
+        </div>
+      )}
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto px-6 py-6 sm:py-10 max-w-3xl mx-auto w-full space-y-6"
@@ -210,6 +224,7 @@ export default function InterviewChat({
         )}
       </div>
 
+      {!readOnly && (
       <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
         <div className="max-w-3xl mx-auto w-full px-6 py-4">
           {(reportError || voiceError) && (
@@ -291,6 +306,7 @@ export default function InterviewChat({
           </p>
         </div>
       </div>
+      )}
     </div>
   );
 }

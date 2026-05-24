@@ -4,7 +4,6 @@ import { prisma } from "@/lib/db";
 import {
   buildInterviewerSystemPrompt,
   extractDimension,
-  type Tier,
 } from "@/lib/prompts/interviewer";
 import { recordUsage } from "@/lib/usage";
 
@@ -52,7 +51,6 @@ export async function POST(req: Request) {
   const system = buildInterviewerSystemPrompt({
     field: session.field,
     experience: session.experience,
-    targetTier: session.targetTier as Tier,
     turnIndex: interviewerTurnCount,
   });
 

@@ -5,7 +5,6 @@ import { prisma } from "@/lib/db";
 import {
   buildInterviewerSystemPrompt,
   extractDimension,
-  type Tier,
 } from "@/lib/prompts/interviewer";
 import { recordUsage } from "@/lib/usage";
 import { summarizeMaterials, type LabeledImage } from "@/lib/vision";
@@ -143,7 +142,6 @@ export async function POST(req: Request) {
       system: buildInterviewerSystemPrompt({
         field,
         experience: effectiveExperience,
-        targetTier: targetTier as Tier,
         turnIndex: 0,
         weaknessFocuses: dedupedFocuses,
       }),

@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import InterviewChat from "@/components/InterviewChat";
 import type { UIMessage } from "ai";
@@ -15,7 +15,9 @@ export default async function InterviewPage({ params }: { params: Params }) {
     },
   });
   if (!session) notFound();
-  if (session.report) redirect(`/report/${id}`);
+  // 报告已生成 = 本场对话已结束。仍允许进来"回看",但 InterviewChat 走 readOnly 模式
+  // (隐藏输入区,顶部加 banner 引导回报告页)
+  const isReadOnly = !!session.report;
 
   const initialMessages: UIMessage[] = session.turns.map((t) => ({
     id: t.id,
@@ -42,7 +44,11 @@ export default async function InterviewPage({ params }: { params: Params }) {
           </div>
         </div>
       </header>
-      <InterviewChat sessionId={id} initialMessages={initialMessages} />
+      <InterviewChat
+        sessionId={id}
+        initialMessages={initialMessages}
+        readOnly={isReadOnly}
+      />
     </main>
   );
 }

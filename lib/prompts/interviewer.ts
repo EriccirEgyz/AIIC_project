@@ -14,13 +14,14 @@
  *  5. 不做评分、不给反馈 —— 那是 report.ts 的事
  */
 
-export type Tier = "top5" | "top10" | "211";
+// 单一风格 - 之前的 top5/top10/211 区分已经在 UI 砍掉,Tier 类型废弃,
+// 这里直接保留一个"严谨认真但不为难"的导师人格。
+const INTERVIEWER_STYLE = `严谨认真的研究生导师风格 —— 把候选人当未来同事来评估,关心 ta 的工作是否真的经得起推敲。
 
-const TIER_STYLE: Record<Tier, string> = {
-  top5: "极其犀利,会刨根问底到候选人答不上来为止。默认假设候选人在夸大,需要候选人用具体数字、ablation、baseline 对比来自证。",
-  top10: "认真严谨,关注方法合理性、结果可复现、是否真的理解原理。会追问选择某方法的真实理由而不接受'我看 SOTA 就用了'。",
-  "211": "友善但专业,重点确认这段经历是否候选人本人独立完成、对基础概念是否清晰、最终结果是否经得起最基础的质疑。",
-};
+- 要求候选人用具体数字、ablation、baseline、统计显著性来支撑结论
+- 不接受模糊回答(如"差不多"/"应该是"),会定向追问"具体一点"
+- 期望候选人用严谨证据自圆其说,而不只是抛结论
+- 不为难,但也不放水`;
 
 /**
  * AI 领域追问的"弹药库" —— 列出该领域真实导师会重点挖的点。
@@ -67,7 +68,6 @@ NeurIPS / ICML / ICLR / CVPR / ICCV / ECCV / ACL / EMNLP / NAACL / KDD / WWW / R
 export function buildInterviewerSystemPrompt(opts: {
   field: string;
   experience: string;
-  targetTier: Tier;
   turnIndex: number; // 0-based:下一条 interviewer 消息是第几轮
   /**
    * 用户主动指定的"本场重点挖的薄弱点"列表(1 个或多个)。
@@ -77,7 +77,7 @@ export function buildInterviewerSystemPrompt(opts: {
    */
   weaknessFocuses?: string[];
 }) {
-  const { field, experience, targetTier, turnIndex, weaknessFocuses } = opts;
+  const { field, experience, turnIndex, weaknessFocuses } = opts;
   const focuses = (weaknessFocuses ?? [])
     .map((s) => s.trim())
     .filter(Boolean);
@@ -125,7 +125,7 @@ ${numbered}
 - 如果候选人完全没有 ${field} 相关基础,直接问 ta 对 ${field} 的兴趣和阅读积累
 ${focusBlock}
 【你的风格】
-${TIER_STYLE[targetTier]}
+${INTERVIEWER_STYLE}
 
 【候选人提交的科研经历原文】
 """
@@ -149,7 +149,7 @@ ${stage}
 - 必须引用候选人原文或前几轮回答里的具体细节(如 "你刚才提到用了 XX 模型...")
 - 禁止抽象口号("说说你的科研感悟"),问题必须具体可答
 - 在每条回复的最开始用 <dim>X</dim> 标注本轮命中的维度(motivation/method/data/failure/reflection),然后换行,再写问题正文
-- 不要做总结、不要给评价、不要鼓励、不要说"好的"/"我明白了"—— 一个导师在面试中只会冷静地继续追问
+- 不要做总结、不要给评价、不要鼓励、不要说"好的"/"我明白了"—— 一个导师在面试中只会专注地继续追问
 - 如果候选人答得明显模糊(如"差不多"/"应该是"/"记不太清"),不要换话题,定向追问"具体一点"
 
 【输出格式示例】
