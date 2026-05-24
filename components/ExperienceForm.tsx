@@ -150,7 +150,7 @@ export default function ExperienceForm() {
           rows={10}
           maxLength={8000}
           className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 resize-y"
-          placeholder={`粘贴或直接写下你的一段科研经历，200-500 字最佳。包含：\n  · 课题是什么\n  · 你负责的部分\n  · 用了什么方法\n  · 拿到什么结果\n（脱敏，不要包含真实姓名、学校、实验室名）`}
+          placeholder={`粘贴或直接写下你的一段科研经历，200-500 字最佳。包含：\n  · 课题是什么\n  · 你负责的部分\n  · 用了什么方法\n  · 拿到什么结果`}
           required
         />
         <div className="mt-1 text-xs text-zinc-400 text-right">

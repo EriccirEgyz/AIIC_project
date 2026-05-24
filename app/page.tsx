@@ -39,9 +39,6 @@ export default function Home() {
           <li>
             · 不给鼓励，只给「真实 AI 方向导师此刻会追问什么 / 你被刷的硬伤在哪」
           </li>
-          <li>
-            · 用脱敏数据测试，<strong>不要</strong>粘贴真人个人信息
-          </li>
         </ul>
       </section>
       <section className="max-w-3xl w-full mx-auto px-6 pb-24">

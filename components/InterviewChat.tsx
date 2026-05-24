@@ -21,6 +21,8 @@ const DIM_COLOR: Record<string, string> = {
   reflection: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200",
 };
 
+type RecState = "idle" | "recording" | "transcribing";
+
 export default function InterviewChat({
   sessionId,
   initialMessages,
@@ -33,6 +35,14 @@ export default function InterviewChat({
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // ---- 录音状态 ----
+  const [recState, setRecState] = useState<RecState>("idle");
+  const [recSeconds, setRecSeconds] = useState(0);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { messages, sendMessage, status, error } = useChat({
     messages: initialMessages,
@@ -48,6 +58,16 @@ export default function InterviewChat({
       behavior: "smooth",
     });
   }, [messages.length, status]);
+
+  // 清理录音 effect
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      mediaRecorderRef.current?.stream
+        ?.getTracks()
+        .forEach((t) => t.stop());
+    };
+  }, []);
 
   const isBusy = status === "submitted" || status === "streaming";
   const interviewerTurns = messages.filter((m) => m.role === "assistant").length;
@@ -77,6 +97,87 @@ export default function InterviewChat({
       setReportError((e as Error).message);
       setReportLoading(false);
     }
+  }
+
+  // ---- 录音逻辑 ----
+  async function startRecording() {
+    setVoiceError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setVoiceError("当前浏览器不支持录音(请用 Chrome / Edge)");
+      return;
+    }
+    if (typeof MediaRecorder === "undefined") {
+      setVoiceError("当前浏览器不支持 MediaRecorder");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = pickMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
+        void handleTranscribe(blob);
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setRecState("recording");
+      setRecSeconds(0);
+      timerRef.current = setInterval(() => {
+        setRecSeconds((s) => s + 1);
+      }, 1000);
+    } catch (e) {
+      const err = e as DOMException;
+      if (err.name === "NotAllowedError") {
+        setVoiceError("麦克风权限被拒绝,请在浏览器地址栏左侧重新授权");
+      } else {
+        setVoiceError(`录音启动失败: ${err.message}`);
+      }
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current && recState === "recording") {
+      mediaRecorderRef.current.stop();
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setRecState("transcribing");
+    }
+  }
+
+  async function handleTranscribe(blob: Blob) {
+    try {
+      const form = new FormData();
+      form.append("audio", blob, "recording");
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        body: form,
+      });
+      const data = (await res.json()) as { text?: string; message?: string; error?: string };
+      if (!res.ok) throw new Error(data.message ?? data.error ?? "转写失败");
+      // 把转写结果追加到 input(不直接发送,允许用户编辑)
+      setInput((prev) =>
+        prev.trim() ? `${prev.trim()} ${data.text ?? ""}` : data.text ?? "",
+      );
+    } catch (e) {
+      setVoiceError(`转写失败: ${(e as Error).message}`);
+    } finally {
+      setRecState("idle");
+      setRecSeconds(0);
+    }
+  }
+
+  function toggleRecording() {
+    if (recState === "idle") void startRecording();
+    else if (recState === "recording") stopRecording();
   }
 
   return (
@@ -111,12 +212,37 @@ export default function InterviewChat({
 
       <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
         <div className="max-w-3xl mx-auto w-full px-6 py-4">
-          {reportError && (
+          {(reportError || voiceError) && (
             <p className="text-sm text-rose-600 dark:text-rose-400 mb-2">
-              ⚠ {reportError}
+              ⚠ {reportError ?? voiceError}
             </p>
           )}
           <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+            <button
+              type="button"
+              onClick={toggleRecording}
+              disabled={isBusy || recState === "transcribing"}
+              title={
+                recState === "idle"
+                  ? "按一下开始录音,再按一下停止"
+                  : recState === "recording"
+                    ? "正在录音,点击停止"
+                    : "转写中..."
+              }
+              className={`shrink-0 self-stretch w-12 rounded-lg border text-lg transition-colors disabled:opacity-40 ${
+                recState === "recording"
+                  ? "bg-rose-600 text-white border-rose-600 animate-pulse"
+                  : recState === "transcribing"
+                    ? "bg-zinc-300 text-zinc-700 border-zinc-300"
+                    : "bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              }`}
+            >
+              {recState === "recording"
+                ? `⏹${recSeconds}s`
+                : recState === "transcribing"
+                  ? "⋯"
+                  : "🎤"}
+            </button>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -128,15 +254,19 @@ export default function InterviewChat({
               }}
               rows={2}
               placeholder={
-                isBusy ? "导师还在说话…" : "Enter 发送 · Shift+Enter 换行"
+                isBusy
+                  ? "导师还在说话…"
+                  : recState === "recording"
+                    ? "正在录音,说完点击停止"
+                    : "Enter 发送 · Shift+Enter 换行 · 🎤 录音"
               }
-              disabled={isBusy}
+              disabled={isBusy || recState !== "idle"}
               className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-50"
             />
             <div className="flex flex-col gap-2">
               <button
                 type="submit"
-                disabled={isBusy || !input.trim()}
+                disabled={isBusy || !input.trim() || recState !== "idle"}
                 className="rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 text-sm font-medium hover:bg-zinc-800 dark:hover:bg-white disabled:opacity-40 transition-colors"
               >
                 发送
@@ -163,6 +293,21 @@ export default function InterviewChat({
       </div>
     </div>
   );
+}
+
+function pickMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined") return undefined;
+  // 优先选 webm/opus,火山接受为 ogg_opus
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+  ];
+  for (const c of candidates) {
+    if (MediaRecorder.isTypeSupported(c)) return c;
+  }
+  return undefined;
 }
 
 function MessageBubble({ message }: { message: UIMessage }) {
