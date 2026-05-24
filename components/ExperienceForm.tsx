@@ -67,11 +67,10 @@ export default function ExperienceForm() {
   const pptRef = useRef<HTMLInputElement>(null);
 
   // 提交后开始计时,让用户看到进度
+  // 只在 isPending=true 时跑计时器;isPending=false 时计数器值不再被读(submitLabel
+  // 里"开始模拟追问 →"分支不引用 elapsedSec),所以无需 reset 回 0。
   useEffect(() => {
-    if (!isPending) {
-      setElapsedSec(0);
-      return;
-    }
+    if (!isPending) return;
     const start = Date.now();
     const id = setInterval(() => {
       setElapsedSec(Math.floor((Date.now() - start) / 1000));
@@ -172,6 +171,7 @@ export default function ExperienceForm() {
       setError("请至少填写一段科研经历(20 字以上)或上传简历 PDF。");
       return;
     }
+    setElapsedSec(0);
     startTransition(async () => {
       try {
         const body: Record<string, unknown> = { field, targetTurns };
@@ -248,7 +248,7 @@ export default function ExperienceForm() {
             />
           )}
           <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-            你想申请的导师所在的研究方向。AI 会按"这位导师"的视角追问你。
+            你想申请的导师所在的研究方向。AI 会按&ldquo;这位导师&rdquo;的视角追问你。
           </p>
         </label>
 

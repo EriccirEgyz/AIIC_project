@@ -20,15 +20,10 @@ const Body = z
   .object({
     experience: z.string().max(8000).optional(),
     field: z.string().min(1).max(60),
-    targetTier: z.enum(["top5", "top10", "211"]).default("top5"),
-    // 向后兼容: 旧 client 传 `images` 字段
-    images: z.array(ImagePage).max(5).optional(),
     resumeImages: z.array(ImagePage).max(5).optional(),
     pptImages: z.array(ImagePage).max(20).optional(),
     // 用户主动指定的"本场重点挖的薄弱点"
     // (项目级别 e.g. "baseline 弱" 或 宏观认知 e.g. "对 LLM 训练范式不熟")
-    // 兼容 string(老调用) 和 string[](新多选 UI)
-    weaknessFocus: z.string().min(1).max(500).optional(),
     weaknessFocuses: z.array(z.string().min(1).max(500)).max(10).optional(),
     // 期望问答轮数: 5/10/15 (短/中/长), 默认 10
     targetTurns: z.number().int().min(3).max(30).optional(),
@@ -36,9 +31,7 @@ const Body = z
   .refine(
     (data) => {
       const hasText = (data.experience?.trim().length ?? 0) >= 20;
-      const hasResume =
-        (data.resumeImages?.length ?? 0) > 0 ||
-        (data.images?.length ?? 0) > 0;
+      const hasResume = (data.resumeImages?.length ?? 0) > 0;
       return hasText || hasResume;
     },
     {
@@ -62,22 +55,18 @@ export async function POST(req: Request) {
   const {
     experience,
     field,
-    targetTier,
     resumeImages,
     pptImages,
-    images,
-    weaknessFocus,
     weaknessFocuses,
     targetTurns,
   } = parsed.data;
-  // 归一化: 老 UI 传 weaknessFocus, 新 UI 传 weaknessFocuses, 合并去重
-  const allFocuses = [
-    ...(weaknessFocus ? [weaknessFocus] : []),
-    ...(weaknessFocuses ?? []),
-  ]
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const dedupedFocuses = Array.from(new Set(allFocuses));
+  const dedupedFocuses = Array.from(
+    new Set(
+      (weaknessFocuses ?? [])
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  );
 
   // 1) 先创建会话, 占位 experience 用空字符串(后续可能被材料摘要替换/补充)
   const initialExperience = experience?.trim() ?? "";
@@ -88,16 +77,13 @@ export async function POST(req: Request) {
           ? initialExperience
           : "[暂无文字经历, 等待材料摘要]",
       field,
-      targetTier,
       ...(targetTurns !== undefined ? { targetTurns } : {}),
     },
   });
 
-  // 2) 如果有任何图片材料(简历/PPT/兼容 images), 调 vision 合并摘要
-  // 兼容: 旧 client 传 images, 视为简历
+  // 2) 如果有任何图片材料(简历/PPT), 调 vision 合并摘要
   const labeledImages: LabeledImage[] = [];
-  const resumeList = resumeImages ?? images ?? [];
-  resumeList.forEach((img, i) => {
+  (resumeImages ?? []).forEach((img, i) => {
     labeledImages.push({
       dataUrl: img.dataUrl,
       pageNumber: i + 1,

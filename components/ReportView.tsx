@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReportJson } from "@/lib/prompts/report";
 
@@ -170,8 +171,8 @@ export default function ReportView({
       {/* 弱点 + 再练一轮合并成一块,避免用户勾选后还要滚过长的"改进示范" 才看到按钮 */}
       <Section title="⚠ 薄弱点 + 针对性再练一轮" tone="amber">
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3 leading-6">
-          勾选 AI 检测出的薄弱点,可叠加自填弱点(支持宏观认知如"对 transformer
-          训练范式不熟"),一键开新会话定向深挖。
+          勾选 AI 检测出的薄弱点,可叠加自填弱点(支持宏观认知如&ldquo;对 transformer
+          训练范式不熟&rdquo;),一键开新会话定向深挖。
         </p>
         <ul className="space-y-2.5 mb-4">
           {report.weaknesses.map((w, i) => (
@@ -222,20 +223,29 @@ export default function ReportView({
         </button>
       </Section>
 
-      <Section title="🎯 可执行改进 — 附示范答法" tone="sky">
-        <div className="space-y-5">
-          {report.improvements.map((imp, i) => (
+      <Section title="🎯 高价值问题 — 示范回答" tone="sky">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4 leading-6">
+          挑出本场答得最薄弱、或真实复试出现概率最高的 2-3 个问题,给出第一人称示范答法(300-500 字)。
+          示范基于你的真实经历,如出现「请按真实情况替换」字样,说明 AI 没拿到具体数字,请自己补。
+        </p>
+        <div className="space-y-6">
+          {(report.modelAnswers ?? []).map((qa, i) => (
             <div
               key={i}
               className="border-l-2 border-sky-400 dark:border-sky-600 pl-4"
             >
-              <p className="text-sm font-medium">{imp.issue}</p>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1 leading-6">
-                {imp.suggestion}
+              <p className="text-[11px] tracking-widest uppercase text-sky-700 dark:text-sky-400 mb-1.5">
+                面试官问 · {i + 1}
               </p>
-              <div className="mt-2 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 px-3 py-2">
-                <p className="text-[11px] text-zinc-500 mb-1">示范回答</p>
-                <p className="text-sm leading-6">{imp.exampleAnswer}</p>
+              <p className="text-sm font-medium leading-6">{qa.question}</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-2 leading-6">
+                <span className="font-medium">你那条的问题:</span> {qa.yourIssue}
+              </p>
+              <div className="mt-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 px-4 py-3">
+                <p className="text-[11px] text-zinc-500 mb-1.5">示范回答</p>
+                <p className="text-sm leading-7 whitespace-pre-wrap">
+                  {qa.modelAnswer}
+                </p>
               </div>
             </div>
           ))}
@@ -243,18 +253,18 @@ export default function ReportView({
       </Section>
 
       <div className="flex gap-3 pt-4">
-        <a
+        <Link
           href="/"
           className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2.5 text-sm text-center hover:bg-zinc-100 dark:hover:bg-zinc-800"
         >
           再练一段
-        </a>
-        <a
+        </Link>
+        <Link
           href={`/interview/${sessionId}`}
           className="flex-1 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2.5 text-sm text-center font-medium"
         >
           回看对话
-        </a>
+        </Link>
       </div>
     </div>
   );

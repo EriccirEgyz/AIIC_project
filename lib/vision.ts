@@ -134,23 +134,3 @@ export async function summarizeMaterials(opts: {
 
   return { summary: text.trim(), tokensIn, tokensOut };
 }
-
-// 兼容旧调用方
-export type ResumeImage = { dataUrl: string };
-export async function summarizeResumeImages(opts: {
-  images: ResumeImage[];
-  field: string;
-  experienceHint?: string;
-  sessionId?: string;
-}): Promise<SummarizeResult> {
-  return summarizeMaterials({
-    images: opts.images.map((img, i) => ({
-      dataUrl: img.dataUrl,
-      pageNumber: i + 1,
-      kind: "resume" as const,
-    })),
-    field: opts.field,
-    experienceHint: opts.experienceHint,
-    sessionId: opts.sessionId,
-  });
-}

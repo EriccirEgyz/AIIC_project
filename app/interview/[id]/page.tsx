@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import InterviewChat from "@/components/InterviewChat";
 import type { UIMessage } from "ai";
@@ -30,12 +31,12 @@ export default async function InterviewPage({ params }: { params: Params }) {
     <main className="flex-1 flex flex-col w-full">
       <header className="sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur">
         <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between text-sm">
-          <a
+          <Link
             href="/"
             className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
           >
             ← 回首页
-          </a>
+          </Link>
           <div className="text-zinc-500">
             <span className="font-medium text-zinc-900 dark:text-zinc-100">
               {session.field}

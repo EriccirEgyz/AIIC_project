@@ -7,9 +7,11 @@
 > 自定义兜底）。**不**面向其他工科/理科/文科 —— 这是产品策略上的「做窄做深」。
 >
 > **做什么**：像 AI 顶会审稿人 + 985 导师一样按「动机 / 方法 / 数据 / 困难 / 反思」
-> 五维度连续追问你的一段科研经历，每轮带维度色标，结束后输出一份**可执行**的反馈
-> 报告（薄弱点 + 红旗 + 可背的示范答法），并支持**针对任意薄弱点（含用户自填）再练
-> 一轮**。
+> 五维度连续追问你的一段科研经历，每轮带维度色标。用户可选**短 5 / 中 10 / 长 15 轮**
+> 三档时长，AI 按预算控制节奏（多项目自动轮转 → 接近尾声主动收尾）。结束后输出一份
+> **可执行**的反馈报告：五维度评分 + 薄弱点 + 致命红旗 + **针对面试中实际被问到的
+> 2-3 个问题给出 300-500 字第一人称示范回答**，并支持**针对任意薄弱点（含用户自填）
+> 再练一轮**。
 
 ---
 
@@ -45,25 +47,28 @@ AI 方向的特殊性让窄定位成立：
 
 | 维度 | ChatGPT 直接问 | 本项目 |
 |---|---|---|
-| 追问框架 | 想到哪问到哪 | 五维度循环 + 阶段策略（开场 → 深挖 → 批判）|
+| 追问框架 | 想到哪问到哪 | 五维度循环 + 多项目自动轮转 + 接近预算时主动收尾 |
+| 节奏控制 | 无预算概念 | 用户选 5/10/15 轮预算，AI 按 perProject 2-3 / 3-5 / 4-6 轮分配 |
 | 领域知识 | 通用 | 内置 6 条动机红旗 + 9 条实验严谨性红旗 + 8 子方向高频追问 |
 | 引用粒度 | 容易抽象 | 强制引用候选人材料里的具体数字、模型名、PPT 图表 |
 | 多模态 | ❌ 看不见你 PPT 上的图 | ✅ Qwen3.6 Plus 视觉摘要简历 + PPT 内容 |
 | 语音 | ❌ | ✅ 火山 ASR 录音转写，模拟复试紧张感 |
-| 反馈形式 | 鼓励式总结 | 严格 0-10 评分 + 致命红旗 + **可直接背的示范答法** |
+| 反馈形式 | 鼓励式总结 | 严格 0-10 评分 + 致命红旗 + **针对实际被问到的问题给 300-500 字第一人称示范回答** |
 | 跨方向 | 通用 | **能区分"你做的方向"vs"目标导师方向"，做迁移追问** |
 | 迭代练习 | ❌ | ✅ 报告页可多选薄弱点 + 自定义补充 → 一键开新会话定向再练 |
-| 持久化 | 一关窗口就没 | SQLite 全档 + `/api/usage` 实时显示 token 与成本 |
+| 持久化 | 一关窗口就没 | SQLite 全档；报告生成后会话进入只读回看模式，顶部 banner 跳回报告 |
+| 成本可见 | 无 | 全程 micro-USD 记账，`/api/usage` 实时显示 token + 成本（按会话或全局） |
 
 ---
 
 ## 用户路径
 
-1. **首页** —— 选「目标导师方向」（8 子方向 + 其他自定义），填文字经历**或**上传简历 PDF（必有其一），可选上传项目演示 PPT
-2. **创建会话** —— AI 先用 Qwen3.6 Plus 看完所有上传材料，摘要进 experience，再生成第一个追问
-3. **面试页（流式聊天）** —— 按 Enter 发送 / Shift+Enter 换行 / 🎤 录音；每条 AI 追问显示维度色标
-4. **结束 · 看报告** —— 至少 3 轮追问后可触发，AI 用 `generateObject` 严格 JSON 输出五维度评分 + 强项 + 薄弱点 + 红旗 + 改进示范法
+1. **首页** —— 选「目标导师方向」（8 子方向 + 其他自定义）+「本场时长」（短 5 / 中 10 / 长 15 轮），填文字经历**或**上传简历 PDF（必有其一），可选上传项目演示 PPT
+2. **创建会话** —— AI 先用 Qwen3.6 Plus 看完所有上传材料，摘要进 experience，再按选定的预算生成第一个追问
+3. **面试页（流式聊天）** —— 按 Enter 发送 / Shift+Enter 换行 / 🎤 录音；每条 AI 追问显示维度色标；底部显示「已完成 X / 约 Y 轮」，超出预算时变 amber 提示，Finish 按钮 pulsing
+4. **结束 · 看报告** —— 至少 3 轮追问后可触发，AI 用 `generateObject` 严格 JSON 输出五维度评分 + 强项 + 薄弱点 + 红旗 + **针对面试中实际被问到的 2-3 个问题给出 300-500 字第一人称示范回答**
 5. **针对薄弱点再练一轮** —— 报告页勾选 AI 检测出的薄弱点（多选）+ 自定义补充宏观/微观弱点 → 一键开新会话，AI 围绕这些薄弱点定向深挖
+6. **回看对话（只读）** —— 报告已生成的会话再次进入 `/interview/[id]` 时进入只读模式，顶部 banner 引导回报告页
 
 ---
 
@@ -124,37 +129,37 @@ region block，详见 [lib/llm.ts](lib/llm.ts) 注释。
 
 ```
 app/
-  page.tsx                       首页:选方向 + 三种输入入口
-  interview/[id]/page.tsx        面试页(流式 SSE + 录音按钮)
-  report/[id]/page.tsx           反馈报告页(评分 + 多选再练)
+  page.tsx                       首页:选方向 + 时长 + 三种输入入口
+  interview/[id]/page.tsx        面试页(流式 SSE + 录音 + 预算提示;报告生成后只读)
+  report/[id]/page.tsx           反馈报告页(评分 + 示范回答 + 多选再练)
   api/
     sample/route.ts              AI 生成 AI 方向脱敏样例(lite model)
-    session/route.ts             创建会话: vision 摘要 + 注入 weaknessFocuses
-    chat/route.ts                多轮追问流式接口(useChat 后端)
-    report/route.ts              generateObject 输出 JSON 报告
+    session/route.ts             创建会话: vision 摘要 + 注入 weaknessFocuses + targetTurns
+    chat/route.ts                多轮追问流式接口(useChat 后端,带 budgetStatus 收尾)
+    report/route.ts              generateObject 输出 JSON 报告(含 modelAnswers)
     transcribe/route.ts          语音转写中转(浏览器音频 → 火山 ASR)
     usage/route.ts               查询累计 token + cost(按会话或全局)
   generated/prisma/              Prisma Client(gitignore)
 lib/
   db.ts                          Prisma + better-sqlite3 adapter
-  llm.ts                         provider-agnostic LLM 客户端 + CN routing
+  llm.ts                         provider-agnostic LLM 客户端 + CN routing(Azure 兜底)
   usage.ts                       pricing 表 + recordUsage(micro-USD 整数避免精度漂移)
-  vision.ts                      Qwen3.6 Plus 多模态摘要(简历 + PPT 分类追问)
-  volc-asr.ts                    火山引擎 ASR REST 客户端
+  vision.ts                      Qwen3.6 Plus 多模态摘要(简历 + PPT 分类标签)
+  volc-asr.ts                    火山引擎 ASR REST 客户端(极速版,同步 + base64)
   pdf-render.ts                  客户端 pdfjs-dist → canvas → PNG dataUrl
   prompts/
-    interviewer.ts               五维度 + 8 子方向追问弹药库(差异化核心)
-    report.ts                    评分锚点 + JSON schema
-    sample.ts                    AI 方向样例生成
+    interviewer.ts               五维度 + 8 子方向追问弹药库 + 动态预算 budgetStatus
+    report.ts                    评分锚点 + JSON schema + modelAnswers 写法约束
+    sample.ts                    AI 方向脱敏样例生成
 components/
-  ExperienceForm.tsx             首页表单(文字 + 简历 + PPT 三槽位)
-  InterviewChat.tsx              聊天 + MediaRecorder 录音
-  ReportView.tsx                 评分卡 + 多选薄弱点 + 自定义再练
+  ExperienceForm.tsx             首页表单(方向 + 时长 + 文字 + 简历 + PPT)
+  InterviewChat.tsx              聊天 + MediaRecorder 录音 + 预算 UI + 只读模式
+  ReportView.tsx                 评分卡 + 示范回答区 + 多选薄弱点 + 自定义再练
 prisma/
   schema.prisma                  Session / Turn / Report / UsageLog
 public/
   pdf.worker.min.mjs             pdfjs worker(postinstall 复制)
-  voice-test.html                独立测试页:验证浏览器 Web Speech API 可用性
+  voice-test.html                独立测试页:验证浏览器麦克风 + MediaRecorder 兼容性
 ```
 
 ---
@@ -174,6 +179,9 @@ pm2 start npm --name aiic -- start
 #     reverse_proxy localhost:3000
 # }
 ```
+
+> 国内服务器若没有 ICP 备案，公网 80/443 会被阻断。退而求其次的方案是 Caddy 监听非
+> 标准端口（如 :8443）+ openssl 自签证书；语音功能要求 HTTPS，所以自签是底线。
 
 ---
 

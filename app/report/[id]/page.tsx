@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import ReportView from "@/components/ReportView";
 import type { ReportJson } from "@/lib/prompts/report";
@@ -26,18 +27,18 @@ export default async function ReportPage({ params }: { params: Params }) {
     <main className="flex-1 flex flex-col w-full">
       <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80">
         <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between text-sm">
-          <a
+          <Link
             href="/"
             className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
           >
             ← 回首页
-          </a>
-          <a
+          </Link>
+          <Link
             href={`/interview/${id}`}
             className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
           >
             重看对话 →
-          </a>
+          </Link>
         </div>
       </header>
       <div className="max-w-3xl w-full mx-auto px-6 py-10">
