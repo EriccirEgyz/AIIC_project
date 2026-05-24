@@ -3,18 +3,20 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+// 8 大类按 2026 本科生 AI 项目真实分布排序(综合 NeurIPS 2025 主题分布 +
+// 国内高校 AI 招生方向 + 知乎讨论)。「其他」兜底 AI4Sci/MLSys/具身/AI 安全
+// 等长尾(本科生群体里量都很小)。
 const FIELD_PRESETS = [
-  "计算机视觉",
-  "自然语言处理",
-  "机器学习理论",
-  "操作系统/系统",
-  "数据库",
-  "凝聚态物理",
-  "高分子化学",
-  "细胞生物学",
-  "金融数学",
-  "认知神经科学",
+  "大语言模型 / Agent / RLHF",
+  "计算机视觉(经典任务)",
+  "多模态 / 视觉语言模型",
+  "生成模型 / 扩散模型",
+  "强化学习 / 决策智能",
+  "推荐 / 搜索 / 广告",
+  "机器学习理论 / 算法",
+  "模型效率 / 推理优化",
 ];
+const FIELD_CUSTOM = "__custom__";
 
 const TIERS = [
   { value: "top5", label: "Top 5 (清北复交浙)", hint: "犀利、刨根问底" },
@@ -24,7 +26,8 @@ const TIERS = [
 
 export default function ExperienceForm() {
   const router = useRouter();
-  const [field, setField] = useState(FIELD_PRESETS[0]);
+  const [fieldChoice, setFieldChoice] = useState<string>(FIELD_PRESETS[0]);
+  const [customField, setCustomField] = useState("");
   const [targetTier, setTargetTier] =
     useState<(typeof TIERS)[number]["value"]>("top5");
   const [experience, setExperience] = useState("");
@@ -32,8 +35,24 @@ export default function ExperienceForm() {
   const [genLoading, setGenLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
+  // 真正发给 API 的方向值:预设直接用,自定义用 customField。
+  const field =
+    fieldChoice === FIELD_CUSTOM ? customField.trim() : fieldChoice;
+
+  function validateField(): string | null {
+    if (fieldChoice === FIELD_CUSTOM && customField.trim().length < 2) {
+      return "请填写自定义研究方向(至少 2 字)";
+    }
+    return null;
+  }
+
   async function generateSample() {
     setError(null);
+    const fieldErr = validateField();
+    if (fieldErr) {
+      setError(fieldErr);
+      return;
+    }
     setGenLoading(true);
     try {
       const res = await fetch("/api/sample", {
@@ -54,6 +73,11 @@ export default function ExperienceForm() {
   async function startInterview(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const fieldErr = validateField();
+    if (fieldErr) {
+      setError(fieldErr);
+      return;
+    }
     if (experience.trim().length < 20) {
       setError("科研经历至少 20 字");
       return;
@@ -81,21 +105,31 @@ export default function ExperienceForm() {
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label className="block">
-          <span className="text-sm font-medium">研究方向</span>
-          <input
-            list="field-presets"
-            value={field}
-            onChange={(e) => setField(e.target.value)}
+          <span className="text-sm font-medium">AI 研究方向</span>
+          <select
+            value={fieldChoice}
+            onChange={(e) => setFieldChoice(e.target.value)}
             className="mt-1.5 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
-            placeholder="如 计算机视觉"
-            maxLength={60}
-            required
-          />
-          <datalist id="field-presets">
+          >
             {FIELD_PRESETS.map((f) => (
-              <option key={f} value={f} />
+              <option key={f} value={f}>
+                {f}
+              </option>
             ))}
-          </datalist>
+            <option value={FIELD_CUSTOM}>其他(自定义)…</option>
+          </select>
+          {fieldChoice === FIELD_CUSTOM && (
+            <input
+              type="text"
+              value={customField}
+              onChange={(e) => setCustomField(e.target.value)}
+              className="mt-2 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+              placeholder="如 AI for Science / 类脑计算 / 神经辐射场"
+              maxLength={60}
+              autoFocus
+              required
+            />
+          )}
         </label>
         <label className="block">
           <span className="text-sm font-medium">目标院校层次</span>

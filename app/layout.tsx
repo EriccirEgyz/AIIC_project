@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "保研深挖 · 科研经历模拟面试",
+  title: "AI 保研深挖 · 顶会式科研经历追问",
   description:
-    "像真实导师一样追问你的科研经历，五维度深挖 + 可执行反馈，专为保研复试设计。",
+    "像 AI 顶会审稿人一样追问你的科研经历，按 ablation / baseline / 显著性 / 复现性深挖。专为想保研到人工智能方向的本科生设计。",
 };
 
 export default function RootLayout({
