@@ -28,7 +28,9 @@ const Body = z
     pptImages: z.array(ImagePage).max(20).optional(),
     // 用户主动指定的"本场重点挖的薄弱点"
     // (项目级别 e.g. "baseline 弱" 或 宏观认知 e.g. "对 LLM 训练范式不熟")
+    // 兼容 string(老调用) 和 string[](新多选 UI)
     weaknessFocus: z.string().min(1).max(500).optional(),
+    weaknessFocuses: z.array(z.string().min(1).max(500)).max(10).optional(),
   })
   .refine(
     (data) => {
@@ -64,7 +66,16 @@ export async function POST(req: Request) {
     pptImages,
     images,
     weaknessFocus,
+    weaknessFocuses,
   } = parsed.data;
+  // 归一化: 老 UI 传 weaknessFocus, 新 UI 传 weaknessFocuses, 合并去重
+  const allFocuses = [
+    ...(weaknessFocus ? [weaknessFocus] : []),
+    ...(weaknessFocuses ?? []),
+  ]
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const dedupedFocuses = Array.from(new Set(allFocuses));
 
   // 1) 先创建会话, 占位 experience 用空字符串(后续可能被材料摘要替换/补充)
   const initialExperience = experience?.trim() ?? "";
@@ -134,7 +145,7 @@ export async function POST(req: Request) {
         experience: effectiveExperience,
         targetTier: targetTier as Tier,
         turnIndex: 0,
-        weaknessFocus,
+        weaknessFocuses: dedupedFocuses,
       }),
       prompt: "开始本场面试,问出你的第一个问题。",
       temperature: 0.7,

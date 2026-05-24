@@ -28,9 +28,10 @@ export default function ReportView({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // "针对薄弱点再练一轮" 相关
-  const [focusingOn, setFocusingOn] = useState<string | null>(null);
-  const [customFocus, setCustomFocus] = useState("");
+  // "针对薄弱点再练一轮" — 支持多选 AI 检测出的薄弱点 + 自定义补充
+  const [selectedAi, setSelectedAi] = useState<Set<number>>(new Set());
+  const [customText, setCustomText] = useState("");
+  const [focusLoading, setFocusLoading] = useState(false);
   const [focusError, setFocusError] = useState<string | null>(null);
 
   async function generate() {
@@ -52,14 +53,37 @@ export default function ReportView({
     }
   }
 
-  async function practiceOn(weakness: string) {
-    const text = weakness.trim();
-    if (!text) {
-      setFocusError("请输入一个薄弱点");
+  function toggleAi(idx: number) {
+    setSelectedAi((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }
+
+  // 汇总要发给后端的薄弱点列表
+  function collectFocuses(weaknesses: string[]): string[] {
+    const fromAi = Array.from(selectedAi)
+      .sort((a, b) => a - b)
+      .map((i) => weaknesses[i])
+      .filter(Boolean);
+    const fromCustom = customText
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    // 简单去重(完全相同的文本不重复)
+    return Array.from(new Set([...fromAi, ...fromCustom]));
+  }
+
+  async function practiceOnSelected(weaknesses: string[]) {
+    const focuses = collectFocuses(weaknesses);
+    if (focuses.length === 0) {
+      setFocusError("请先勾选或写入至少一个薄弱点");
       return;
     }
     setFocusError(null);
-    setFocusingOn(text);
+    setFocusLoading(true);
     try {
       const res = await fetch("/api/session", {
         method: "POST",
@@ -67,7 +91,7 @@ export default function ReportView({
         body: JSON.stringify({
           experience: originalExperience,
           field: originalField,
-          weaknessFocus: text,
+          weaknessFocuses: focuses,
         }),
       });
       const data = await res.json();
@@ -76,7 +100,7 @@ export default function ReportView({
       router.push(`/interview/${data.sessionId}`);
     } catch (e) {
       setFocusError((e as Error).message);
-      setFocusingOn(null);
+      setFocusLoading(false);
     }
   }
 
@@ -100,7 +124,9 @@ export default function ReportView({
     );
   }
 
-  const isBusy = focusingOn !== null;
+  const focusCount =
+    selectedAi.size +
+    customText.split("\n").map((s) => s.trim()).filter(Boolean).length;
 
   return (
     <div className="space-y-8">
@@ -141,25 +167,25 @@ export default function ReportView({
         </ul>
       </Section>
 
-      <Section title="⚠ 薄弱点(按严重度) — 点右侧按钮可针对它再练一轮" tone="amber">
-        <ol className="space-y-3 list-decimal list-inside">
+      <Section title="⚠ 薄弱点(按严重度) — 勾选若干条进入下方再练一轮" tone="amber">
+        <ul className="space-y-2.5">
           {report.weaknesses.map((w, i) => (
-            <li
-              key={i}
-              className="text-sm leading-6 flex items-start justify-between gap-3"
-            >
-              <span className="flex-1">{w}</span>
-              <button
-                type="button"
-                onClick={() => practiceOn(w)}
-                disabled={isBusy}
-                className="shrink-0 text-xs rounded-md border border-amber-400/50 dark:border-amber-500/40 bg-white/70 dark:bg-amber-950/30 px-2.5 py-1 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-40 transition-colors"
-              >
-                {focusingOn === w ? "准备中…" : "针对这点再练一轮 →"}
-              </button>
+            <li key={i}>
+              <label className="flex items-start gap-2.5 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={selectedAi.has(i)}
+                  onChange={() => toggleAi(i)}
+                  disabled={focusLoading}
+                  className="mt-1 accent-amber-600 disabled:opacity-50"
+                />
+                <span className="text-sm leading-6 flex-1 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors">
+                  {w}
+                </span>
+              </label>
             </li>
           ))}
-        </ol>
+        </ul>
       </Section>
 
       <Section title="🎯 可执行改进 — 附示范答法" tone="sky">
@@ -182,38 +208,38 @@ export default function ReportView({
         </div>
       </Section>
 
-      {/* 自定义薄弱点再练 — 支持宏观认知层面的弱点 */}
-      <Section title="🎯 想针对其他薄弱点再练?" tone="sky">
+      {/* 自定义薄弱点 + 聚合再练一轮按钮 */}
+      <Section title="🎯 再练一轮 — 上方可勾选 + 这里可自己补充" tone="sky">
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2 leading-6">
-          支持具体项目细节(如 "baseline 选得弱"),也支持宏观认知层面(如
-          "对 transformer 训练范式不熟悉")—— AI 会专门挖你说的这个点。
+          支持项目细节(如 "baseline 选得弱"),也支持宏观认知(如 "对
+          transformer 训练范式不熟")。<strong>每行一条</strong>,留空就只用上方勾选的。
         </p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={customFocus}
-            onChange={(e) => setCustomFocus(e.target.value)}
-            placeholder="如 对所做领域的宏观认识不足 / 对 ablation 的设计思路不熟悉"
-            maxLength={500}
-            disabled={isBusy}
-            className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-50"
-          />
-          <button
-            type="button"
-            onClick={() => practiceOn(customFocus)}
-            disabled={isBusy || !customFocus.trim()}
-            className="shrink-0 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 text-sm font-medium disabled:opacity-40"
-          >
-            {focusingOn && focusingOn === customFocus.trim()
-              ? "准备中…"
-              : "针对这点再练一轮 →"}
-          </button>
-        </div>
+        <textarea
+          value={customText}
+          onChange={(e) => setCustomText(e.target.value)}
+          placeholder={`如:\n对所做领域的宏观认识不足\n对 ablation 的设计思路不熟悉`}
+          rows={4}
+          maxLength={2000}
+          disabled={focusLoading}
+          className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-50 resize-y"
+        />
         {focusError && (
           <p className="text-sm text-rose-600 dark:text-rose-400 mt-2">
             ⚠ {focusError}
           </p>
         )}
+        <button
+          type="button"
+          onClick={() => practiceOnSelected(report.weaknesses)}
+          disabled={focusLoading || focusCount === 0}
+          className="mt-3 w-full rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2.5 text-sm font-medium disabled:opacity-40 transition-colors"
+        >
+          {focusLoading
+            ? `准备中…(${focusCount} 项)`
+            : focusCount === 0
+              ? "请先勾选或写入至少一个薄弱点"
+              : `针对选中的 ${focusCount} 个薄弱点再练一轮 →`}
+        </button>
       </Section>
 
       <div className="flex gap-3 pt-4">

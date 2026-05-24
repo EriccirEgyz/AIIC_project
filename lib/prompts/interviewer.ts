@@ -70,14 +70,17 @@ export function buildInterviewerSystemPrompt(opts: {
   targetTier: Tier;
   turnIndex: number; // 0-based:下一条 interviewer 消息是第几轮
   /**
-   * 用户主动指定的"本场重点挖的薄弱点"。
-   * 可以是项目级别的具体点("baseline 选得弱"),
-   * 也可以是宏观认知层面的("对 transformer 训练范式不理解")。
-   * 模型应该围绕它组织所有追问 —— 即使原经历里没明显信号。
+   * 用户主动指定的"本场重点挖的薄弱点"列表(1 个或多个)。
+   * 每条可以是项目级别("baseline 选得弱")或宏观认知层面
+   * ("对 transformer 训练范式不理解")。模型必须覆盖列表里所有项,
+   * 单项时深挖 5-6 轮,多项时每项 3-5 轮再过渡。
    */
-  weaknessFocus?: string;
+  weaknessFocuses?: string[];
 }) {
-  const { field, experience, targetTier, turnIndex, weaknessFocus } = opts;
+  const { field, experience, targetTier, turnIndex, weaknessFocuses } = opts;
+  const focuses = (weaknessFocuses ?? [])
+    .map((s) => s.trim())
+    .filter(Boolean);
   const stage =
     turnIndex < 2
       ? "开场阶段:先让候选人简要介绍这段经历,问开放性问题(如 '能先用 2 分钟讲一下你这个项目的整体情况吗?' 或 '你在这个项目里具体负责什么部分?')"
@@ -85,19 +88,34 @@ export function buildInterviewerSystemPrompt(opts: {
         ? "深挖阶段:进入具体细节,挑一个之前答得模糊或可疑的点定向追问,不要切换大话题。优先用弹药库里的红旗信号判断挖哪里。"
         : "批判阶段:开始质疑方法选择 / 结果可信度 / 候选人对原理的理解深度。可以引入对比方案、反例、边界情况,或者直接质疑某个数字是否经得起方差检验。";
 
-  const focusBlock = weaknessFocus
-    ? `
+  const focusBlock = (() => {
+    if (focuses.length === 0) return "";
+    if (focuses.length === 1) {
+      return `
 
 【⚠ 本场用户主动指定的重点薄弱点】
 """
-${weaknessFocus}
+${focuses[0]}
 """
 请把所有追问围绕这个薄弱点展开 —— 即使原经历里没明显信号,也要主动设计能暴露这个弱点的问题。
 - 如果是项目级别的弱点(如"baseline 选得弱"),用弹药库相应红旗去深挖原经历的对应环节
 - 如果是宏观认知层面的弱点(如"对 transformer 训练范式不熟悉"),可以脱离原经历,直接问该领域的概念性问题(架构原理、训练 trick、典型论文等),倒逼候选人暴露知识盲区
 - 即使候选人答得不错,也要继续就这个薄弱点深挖至少 5-6 轮再考虑切换话题
-`
-    : "";
+`;
+    }
+    const numbered = focuses.map((f, i) => `${i + 1}. ${f}`).join("\n");
+    return `
+
+【⚠ 本场用户主动指定的 ${focuses.length} 个重点薄弱点】
+${numbered}
+
+请在本场面试里**覆盖所有这些薄弱点**,每个深挖 3-5 轮再过渡到下一个。规则:
+- 项目级别的弱点(如"baseline 弱"、"没 ablation") → 用弹药库相应红旗,深挖原经历的对应环节
+- 宏观认知层面的弱点(如"对 transformer 训练范式不熟") → 可以暂时脱离原经历,直接问该领域的概念性问题,倒逼候选人暴露知识盲区
+- **优先按列表顺序覆盖**,但如果某个回答自然引出列表中的下一个薄弱点,可以顺势切换
+- 切换薄弱点时不需要解释"现在我们换个话题",直接接着问就行 —— 真实导师不会广播自己的提问框架
+`;
+  })();
 
   return `你是一位 ${field} 方向的资深研究生导师。一位想加入你课题组的本科生正在向你做保研复试展示。
 
